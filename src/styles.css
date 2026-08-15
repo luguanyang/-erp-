@@ -1,0 +1,264 @@
+:root {
+  --brand: #e8542e;
+  --brand-dark: #c94321;
+  --nav: #20242a;
+  --nav-light: #2b3038;
+  --bg: #f4f1ec;
+  --ink: #24292f;
+  --muted: #6b7280;
+  --line: #e8e3da;
+  --success: #2e7d32;
+  --danger: #c62828;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+}
+
+.brand-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 1.1fr) minmax(420px, 0.9fr);
+  background: var(--bg);
+}
+
+.brand-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 64px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(232, 84, 46, 0.4), transparent 32%),
+    radial-gradient(circle at 12% 84%, rgba(255, 195, 128, 0.16), transparent 38%),
+    linear-gradient(135deg, #191c21 0%, #262b32 100%);
+}
+
+.brand-panel::after {
+  content: "";
+  position: absolute;
+  right: -120px;
+  bottom: -140px;
+  width: 420px;
+  height: 420px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  box-shadow: 0 0 0 46px rgba(255, 255, 255, 0.04), 0 0 0 92px rgba(255, 255, 255, 0.03);
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 40px;
+}
+
+.brand-panel h1 {
+  font-size: 40px;
+  line-height: 1.2;
+  margin: 0 0 18px;
+  letter-spacing: 1px;
+}
+
+.brand-panel p {
+  max-width: 420px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.login-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-box h2 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.login-box .subtitle {
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+
+.admin-shell {
+  min-height: 100vh;
+}
+
+.admin-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-logo .logo-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 15px;
+}
+
+.admin-header {
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-content {
+  padding: 24px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.page-head .page-subtitle {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: "";
+  position: absolute;
+  right: -24px;
+  top: -24px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: rgba(232, 84, 46, 0.08);
+}
+
+.stat-card .ant-statistic-title {
+  color: var(--muted);
+}
+
+.stat-card .ant-statistic-content {
+  font-weight: 700;
+}
+
+.panel-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.loading-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.status-active {
+  color: var(--success);
+}
+
+.status-disabled {
+  color: var(--muted);
+}
+
+.status-online {
+  color: var(--success);
+}
+
+.status-offline {
+  color: var(--danger);
+}
+
+.order-status {
+  color: var(--brand);
+}
+
+.order-cancelled {
+  color: var(--muted);
+}
+
+.row-selected > td {
+  background: #fff1ec !important;
+}
+
+@media (max-width: 900px) {
+  .brand-page {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-panel {
+    display: none;
+  }
+
+  .login-card {
+    padding: 32px 20px;
+  }
+
+  .admin-content {
+    padding: 16px;
+  }
+}
