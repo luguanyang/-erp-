@@ -12,6 +12,8 @@ import Categories from './pages/Categories'
 import Products from './pages/Products'
 import Inventory from './pages/Inventory'
 import StockLogs from './pages/StockLogs'
+import ProcessLogs from './pages/ProcessLogs'
+import StockCountLogs from './pages/StockCountLogs'
 import Warehouses from './pages/Warehouses'
 import Orders from './pages/Orders'
 import Users from './pages/Users'
@@ -52,6 +54,8 @@ const router = createHashRouter([
       { path: 'products', element: <Products /> },
       { path: 'inventory', element: <Inventory /> },
       { path: 'inventory/logs', element: <StockLogs /> },
+      { path: 'inventory/process', element: <ProcessLogs /> },
+      { path: 'inventory/counts', element: <StockCountLogs /> },
       { path: 'warehouses', element: <Warehouses /> },
       { path: 'orders', element: <Orders /> },
       { path: 'users', element: <Users /> },

@@ -3,9 +3,11 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, Button, Dropdown, Layout, Menu, Space, Tag } from 'antd'
 import {
   AppstoreOutlined,
+  AuditOutlined,
   BarChartOutlined,
   DatabaseOutlined,
   DashboardOutlined,
+  ExperimentOutlined,
   FileTextOutlined,
   LogoutOutlined,
   PrinterOutlined,
@@ -29,6 +31,8 @@ const menuItems = [
     children: [
       { key: '/inventory', icon: <DatabaseOutlined />, label: '库存' },
       { key: '/inventory/logs', icon: <FileTextOutlined />, label: '出入库记录' },
+      { key: '/inventory/process', icon: <ExperimentOutlined />, label: '加工记录' },
+      { key: '/inventory/counts', icon: <AuditOutlined />, label: '盘存记录' },
     ],
   },
   { key: '/warehouses', icon: <DatabaseOutlined />, label: '仓库' },

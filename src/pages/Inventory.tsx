@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -20,8 +19,6 @@ import PageHeader from '../components/PageHeader'
 import type {
   CategoryItem,
   InventoryItem,
-  ProcessLogItem,
-  StockCountLogItem,
   StockLogItem,
   WarehouseItem,
 } from '../types'
@@ -67,23 +64,9 @@ export default function Inventory() {
   const [processing, setProcessing] = useState<InventoryItem | null>(null)
   const [processForm] = Form.useForm<ProcessForm>()
   const [processOpen, setProcessOpen] = useState(false)
-  const [processLogs, setProcessLogs] = useState<ProcessLogItem[]>([])
-  const [processLogsOpen, setProcessLogsOpen] = useState(false)
-  const [processLogsLoading, setProcessLogsLoading] = useState(false)
-  const [processKeyword, setProcessKeyword] = useState('')
-  const [processPage, setProcessPage] = useState(1)
-  const [processPageSize, setProcessPageSize] = useState(20)
-  const [processTotal, setProcessTotal] = useState(0)
   const [counting, setCounting] = useState<InventoryItem | null>(null)
   const [countForm] = Form.useForm<CountForm>()
   const [countOpen, setCountOpen] = useState(false)
-  const [countLogs, setCountLogs] = useState<StockCountLogItem[]>([])
-  const [countLogsOpen, setCountLogsOpen] = useState(false)
-  const [countLogsLoading, setCountLogsLoading] = useState(false)
-  const [countKeyword, setCountKeyword] = useState('')
-  const [countPage, setCountPage] = useState(1)
-  const [countPageSize, setCountPageSize] = useState(20)
-  const [countTotal, setCountTotal] = useState(0)
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -275,31 +258,6 @@ export default function Inventory() {
     }
   }
 
-  async function loadProcessLogs(
-    page = processPage,
-    pageSize = processPageSize,
-    keyword = processKeyword,
-  ) {
-    setProcessLogsLoading(true)
-    try {
-      const res = await api.processLogList({ page, pageSize, keyword })
-      setProcessLogs(res.list)
-      setProcessTotal(res.total)
-      setProcessPage(page)
-      setProcessPageSize(pageSize)
-      setProcessKeyword(keyword)
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : '加载加工记录失败')
-    } finally {
-      setProcessLogsLoading(false)
-    }
-  }
-
-  function openProcessLogs() {
-    setProcessLogsOpen(true)
-    loadProcessLogs(1, processPageSize, '')
-  }
-
   function openCount(record: InventoryItem) {
     setCounting(record)
     countForm.resetFields()
@@ -335,31 +293,6 @@ export default function Inventory() {
     } finally {
       setSaving(false)
     }
-  }
-
-  async function loadCountLogs(
-    page = countPage,
-    pageSize = countPageSize,
-    keyword = countKeyword,
-  ) {
-    setCountLogsLoading(true)
-    try {
-      const res = await api.stockCountLogList({ page, pageSize, keyword })
-      setCountLogs(res.list)
-      setCountTotal(res.total)
-      setCountPage(page)
-      setCountPageSize(pageSize)
-      setCountKeyword(keyword)
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : '加载盘存记录失败')
-    } finally {
-      setCountLogsLoading(false)
-    }
-  }
-
-  function openCountLogs() {
-    setCountLogsOpen(true)
-    loadCountLogs(1, countPageSize, '')
   }
 
   const currentProcessed = Form.useWatch('processed', processForm)
@@ -438,10 +371,10 @@ export default function Inventory() {
         <Button icon={<HistoryOutlined />} onClick={() => navigate('/inventory/logs')}>
           出入库记录
         </Button>
-        <Button icon={<ExperimentOutlined />} onClick={openProcessLogs}>
+        <Button icon={<ExperimentOutlined />} onClick={() => navigate('/inventory/process')}>
           加工记录
         </Button>
-        <Button icon={<AuditOutlined />} onClick={openCountLogs}>
+        <Button icon={<AuditOutlined />} onClick={() => navigate('/inventory/counts')}>
           盘存记录
         </Button>
         <Button type="primary" onClick={load}>
@@ -751,69 +684,6 @@ export default function Inventory() {
           </Form.Item>
         </Form>
       </Modal>
-      <Drawer
-        title="加工记录"
-        open={processLogsOpen}
-        onClose={() => setProcessLogsOpen(false)}
-        width={960}
-        extra={
-          <Space>
-            <Input
-              allowClear
-              placeholder="搜索商品"
-              prefix={<SearchOutlined />}
-              style={{ width: 200 }}
-              value={processKeyword}
-              onChange={(e) => setProcessKeyword(e.target.value)}
-              onPressEnter={() => loadProcessLogs(1, processPageSize, processKeyword)}
-            />
-            <Button type="primary" onClick={() => loadProcessLogs(1, processPageSize, processKeyword)}>
-              查询
-            </Button>
-          </Space>
-        }
-      >
-        <Spin spinning={processLogsLoading}>
-          <Table<ProcessLogItem>
-            rowKey="id"
-            dataSource={processLogs}
-            pagination={{
-              current: processPage,
-              pageSize: processPageSize,
-              total: processTotal,
-              showSizeChanger: true,
-              onChange: (p, s) => loadProcessLogs(p, s, processKeyword),
-            }}
-            columns={[
-              { title: '商品', dataIndex: 'productName' },
-              { title: '仓库', dataIndex: 'warehouseName', width: 140 },
-              {
-                title: '加工后库存',
-                dataIndex: 'processed',
-                width: 120,
-                render: (v: number) => <strong style={{ color: 'var(--success)' }}>{v}</strong>,
-              },
-              {
-                title: '损耗',
-                dataIndex: 'loss',
-                width: 100,
-                render: (v: number) => (
-                  <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{v}</span>
-                ),
-              },
-              { title: '单位', dataIndex: 'unit', width: 80 },
-              { title: '操作人', dataIndex: 'operator', width: 120 },
-              { title: '备注', dataIndex: 'remark', ellipsis: true },
-              {
-                title: '时间',
-                dataIndex: 'createdAt',
-                width: 180,
-                render: (v: string | Date) => new Date(v).toLocaleString('zh-CN'),
-              },
-            ]}
-          />
-        </Spin>
-      </Drawer>
       <Modal
         title={`盘存 · ${counting?.productName || ''}`}
         open={countOpen}
@@ -863,72 +733,6 @@ export default function Inventory() {
           </Form.Item>
         </Form>
       </Modal>
-      <Drawer
-        title="盘存记录"
-        open={countLogsOpen}
-        onClose={() => setCountLogsOpen(false)}
-        width={960}
-        extra={
-          <Space>
-            <Input
-              allowClear
-              placeholder="搜索商品或操作人"
-              prefix={<SearchOutlined />}
-              style={{ width: 200 }}
-              value={countKeyword}
-              onChange={(e) => setCountKeyword(e.target.value)}
-              onPressEnter={() => loadCountLogs(1, countPageSize, countKeyword)}
-            />
-            <Button type="primary" onClick={() => loadCountLogs(1, countPageSize, countKeyword)}>
-              查询
-            </Button>
-          </Space>
-        }
-      >
-        <Spin spinning={countLogsLoading}>
-          <Table<StockCountLogItem>
-            rowKey="id"
-            dataSource={countLogs}
-            pagination={{
-              current: countPage,
-              pageSize: countPageSize,
-              total: countTotal,
-              showSizeChanger: true,
-              onChange: (p, s) => loadCountLogs(p, s, countKeyword),
-            }}
-            columns={[
-              { title: '商品', dataIndex: 'productName' },
-              { title: '仓库', dataIndex: 'warehouseName', width: 140 },
-              { title: '盘存前', dataIndex: 'stockBefore', width: 100 },
-              { title: '盘存数', dataIndex: 'counted', width: 100 },
-              {
-                title: '差异',
-                dataIndex: 'diff',
-                width: 100,
-                render: (v: number) => (
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: v > 0 ? 'var(--success)' : v < 0 ? 'var(--danger)' : 'inherit',
-                    }}
-                  >
-                    {v > 0 ? `+${v}` : v}
-                  </span>
-                ),
-              },
-              { title: '单位', dataIndex: 'unit', width: 80 },
-              { title: '操作人', dataIndex: 'operator', width: 120 },
-              { title: '备注', dataIndex: 'remark', ellipsis: true },
-              {
-                title: '时间',
-                dataIndex: 'createdAt',
-                width: 180,
-                render: (v: string | Date) => new Date(v).toLocaleString('zh-CN'),
-              },
-            ]}
-          />
-        </Spin>
-      </Drawer>
     </>
   )
 }
