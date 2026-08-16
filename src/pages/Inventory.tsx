@@ -14,13 +14,14 @@ import {
   Tag,
   message,
 } from 'antd'
-import { ExperimentOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
+import { AuditOutlined, ExperimentOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
 import type {
   CategoryItem,
   InventoryItem,
   ProcessLogItem,
+  StockCountLogItem,
   StockLogItem,
   WarehouseItem,
 } from '../types'
@@ -46,6 +47,12 @@ interface ProcessForm {
   remark: string
 }
 
+interface CountForm {
+  warehouseId?: string
+  counted: number
+  remark: string
+}
+
 export default function Inventory() {
   const navigate = useNavigate()
   const [form] = Form.useForm<InventoryForm>()
@@ -67,6 +74,16 @@ export default function Inventory() {
   const [processPage, setProcessPage] = useState(1)
   const [processPageSize, setProcessPageSize] = useState(20)
   const [processTotal, setProcessTotal] = useState(0)
+  const [counting, setCounting] = useState<InventoryItem | null>(null)
+  const [countForm] = Form.useForm<CountForm>()
+  const [countOpen, setCountOpen] = useState(false)
+  const [countLogs, setCountLogs] = useState<StockCountLogItem[]>([])
+  const [countLogsOpen, setCountLogsOpen] = useState(false)
+  const [countLogsLoading, setCountLogsLoading] = useState(false)
+  const [countKeyword, setCountKeyword] = useState('')
+  const [countPage, setCountPage] = useState(1)
+  const [countPageSize, setCountPageSize] = useState(20)
+  const [countTotal, setCountTotal] = useState(0)
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -283,8 +300,72 @@ export default function Inventory() {
     loadProcessLogs(1, processPageSize, '')
   }
 
+  function openCount(record: InventoryItem) {
+    setCounting(record)
+    countForm.resetFields()
+    countForm.setFieldsValue({
+      warehouseId:
+        filters.warehouseId ||
+        warehouses[0]?.id ||
+        (record.storeId !== 'all' ? record.storeId : 'wh_main'),
+      counted: record.counted ?? record.processed ?? record.stock,
+      remark: '',
+    })
+    setCountOpen(true)
+  }
+
+  async function handleCount(values: CountForm) {
+    if (!counting) return
+    setSaving(true)
+    try {
+      await api.stockCount({
+        productId: counting.productId,
+        warehouseId: values.warehouseId || 'wh_main',
+        productName: counting.productName,
+        warehouseName:
+          warehouses.find((w) => w.id === values.warehouseId)?.name || counting.storeName,
+        counted: values.counted,
+        remark: values.remark,
+      })
+      message.success('盘存成功')
+      setCountOpen(false)
+      await load()
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '盘存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function loadCountLogs(
+    page = countPage,
+    pageSize = countPageSize,
+    keyword = countKeyword,
+  ) {
+    setCountLogsLoading(true)
+    try {
+      const res = await api.stockCountLogList({ page, pageSize, keyword })
+      setCountLogs(res.list)
+      setCountTotal(res.total)
+      setCountPage(page)
+      setCountPageSize(pageSize)
+      setCountKeyword(keyword)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载盘存记录失败')
+    } finally {
+      setCountLogsLoading(false)
+    }
+  }
+
+  function openCountLogs() {
+    setCountLogsOpen(true)
+    loadCountLogs(1, countPageSize, '')
+  }
+
   const currentProcessed = Form.useWatch('processed', processForm)
   const currentLoss = Math.max(0, (processing?.stock || 0) - Number(currentProcessed || 0))
+  const currentCounted = Form.useWatch('counted', countForm)
+  const countDiff = Number(currentCounted || 0) - (counting?.stock || 0)
 
   async function handleMove(values: StockMoveForm) {
     if (!moving) return
@@ -300,7 +381,7 @@ export default function Inventory() {
         operatorName: moving.type === 'in' ? values.operatorName : undefined,
         reason: values.reason,
       })
-      message.success(moving.type === 'in' ? '入库成功' : '出库成功')
+      message.success(moving.type === 'in' ? '入库成功' : '出数成功')
       setMoving(null)
       await load()
     } catch (err) {
@@ -360,6 +441,9 @@ export default function Inventory() {
         <Button icon={<ExperimentOutlined />} onClick={openProcessLogs}>
           加工记录
         </Button>
+        <Button icon={<AuditOutlined />} onClick={openCountLogs}>
+          盘存记录
+        </Button>
         <Button type="primary" onClick={load}>
           查询
         </Button>
@@ -403,6 +487,19 @@ export default function Inventory() {
                   <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{value ?? 0}</span>
                 ),
               },
+              {
+                title: '出数',
+                dataIndex: 'issued',
+                width: 90,
+                render: (value: number) => <strong>{value ?? 0}</strong>,
+              },
+              {
+                title: '盘存数',
+                dataIndex: 'counted',
+                width: 90,
+                render: (value: number) =>
+                  value === undefined || value === null ? '-' : <strong>{value}</strong>,
+              },
               { title: '最低库存', dataIndex: 'minStock' },
               {
                 title: '成本参考',
@@ -431,7 +528,7 @@ export default function Inventory() {
               },
               {
                 title: '操作',
-                width: 280,
+                width: 340,
                 render: (_, record) => (
                   <Space>
                     <Button
@@ -447,7 +544,15 @@ export default function Inventory() {
                       danger
                       onClick={() => openMove(record, 'out')}
                     >
-                      出库
+                      出数
+                    </Button>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<AuditOutlined />}
+                      onClick={() => openCount(record)}
+                    >
+                      盘存
                     </Button>
                     <Button
                       type="link"
@@ -491,7 +596,7 @@ export default function Inventory() {
         </Form>
       </Modal>
       <Modal
-        title={`${moving?.type === 'out' ? '出库' : '入库'}  · ${moving?.record.productName || ''}`}
+        title={`${moving?.type === 'out' ? '出数' : '入库'}  · ${moving?.record.productName || ''}`}
         open={!!moving}
         onCancel={() => setMoving(null)}
         onOk={() => moveForm.submit()}
@@ -504,7 +609,7 @@ export default function Inventory() {
           </Form.Item>
           <Form.Item
             name="warehouseId"
-            label={moving?.type === 'out' ? '出库仓库' : '入库仓库'}
+            label={moving?.type === 'out' ? '出数仓库' : '入库仓库'}
             rules={[{ required: true, message: '请选择仓库' }]}
           >
             <Select
@@ -694,6 +799,121 @@ export default function Inventory() {
                 width: 100,
                 render: (v: number) => (
                   <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{v}</span>
+                ),
+              },
+              { title: '单位', dataIndex: 'unit', width: 80 },
+              { title: '操作人', dataIndex: 'operator', width: 120 },
+              { title: '备注', dataIndex: 'remark', ellipsis: true },
+              {
+                title: '时间',
+                dataIndex: 'createdAt',
+                width: 180,
+                render: (v: string | Date) => new Date(v).toLocaleString('zh-CN'),
+              },
+            ]}
+          />
+        </Spin>
+      </Drawer>
+      <Modal
+        title={`盘存 · ${counting?.productName || ''}`}
+        open={countOpen}
+        onCancel={() => setCountOpen(false)}
+        onOk={() => countForm.submit()}
+        confirmLoading={saving}
+        destroyOnClose
+      >
+        <Form<CountForm> form={countForm} layout="vertical" onFinish={handleCount}>
+          <Form.Item
+            name="warehouseId"
+            label="盘存仓库"
+            rules={[{ required: true, message: '请选择仓库' }]}
+          >
+            <Select
+              placeholder="请选择仓库"
+              options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="counted"
+            label="盘存数"
+            rules={[{ required: true, message: '请输入盘存数' }]}
+          >
+            <InputNumber
+              min={0}
+              precision={0}
+              style={{ width: '100%' }}
+              addonAfter={counting?.unit || '件'}
+            />
+          </Form.Item>
+          <div
+            style={{
+              padding: '10px 12px',
+              marginBottom: 16,
+              borderRadius: 8,
+              background: countDiff === 0 ? '#f1f8f1' : '#fff1ec',
+              color: countDiff === 0 ? 'var(--success)' : 'var(--danger)',
+              fontSize: 13,
+            }}
+          >
+            当前库存 {counting?.stock || 0}，预计差异{' '}
+            {countDiff > 0 ? `+${countDiff}` : countDiff}
+          </div>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="选填，例如月末盘点、临时盘点等" />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Drawer
+        title="盘存记录"
+        open={countLogsOpen}
+        onClose={() => setCountLogsOpen(false)}
+        width={960}
+        extra={
+          <Space>
+            <Input
+              allowClear
+              placeholder="搜索商品或操作人"
+              prefix={<SearchOutlined />}
+              style={{ width: 200 }}
+              value={countKeyword}
+              onChange={(e) => setCountKeyword(e.target.value)}
+              onPressEnter={() => loadCountLogs(1, countPageSize, countKeyword)}
+            />
+            <Button type="primary" onClick={() => loadCountLogs(1, countPageSize, countKeyword)}>
+              查询
+            </Button>
+          </Space>
+        }
+      >
+        <Spin spinning={countLogsLoading}>
+          <Table<StockCountLogItem>
+            rowKey="id"
+            dataSource={countLogs}
+            pagination={{
+              current: countPage,
+              pageSize: countPageSize,
+              total: countTotal,
+              showSizeChanger: true,
+              onChange: (p, s) => loadCountLogs(p, s, countKeyword),
+            }}
+            columns={[
+              { title: '商品', dataIndex: 'productName' },
+              { title: '仓库', dataIndex: 'warehouseName', width: 140 },
+              { title: '盘存前', dataIndex: 'stockBefore', width: 100 },
+              { title: '盘存数', dataIndex: 'counted', width: 100 },
+              {
+                title: '差异',
+                dataIndex: 'diff',
+                width: 100,
+                render: (v: number) => (
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: v > 0 ? 'var(--success)' : v < 0 ? 'var(--danger)' : 'inherit',
+                    }}
+                  >
+                    {v > 0 ? `+${v}` : v}
+                  </span>
                 ),
               },
               { title: '单位', dataIndex: 'unit', width: 80 },

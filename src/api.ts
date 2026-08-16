@@ -13,6 +13,7 @@ import type {
   PrintLogItem,
   ProductItem,
   StatsSummary,
+  StockCountLogItem,
   StoreDetailData,
   StoreItem,
   UserItem,
@@ -83,6 +84,13 @@ export const api = {
       action: 'stock.process',
       ...data,
     }),
+  stockCount: (data: object) =>
+    callAdmin<{ productId: string; warehouseId: string; counted: number; diff: number }>({
+      action: 'stock.count',
+      ...data,
+    }),
+  stockCountLogList: (data: object) =>
+    callAdmin<PageResult<StockCountLogItem>>({ action: 'stock.countLog.list', ...data }),
   processLogList: (data: object) =>
     callAdmin<PageResult<ProcessLogItem>>({ action: 'process.log.list', ...data }),
 

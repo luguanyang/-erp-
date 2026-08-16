@@ -68,9 +68,27 @@ export interface InventoryItem {
   stock: number
   processed: number
   loss: number
+  issued: number
+  counted: number
   minStock: number
   costPrice: number | null
   low: boolean
+}
+
+export interface StockCountLogItem {
+  id: string
+  productId: string
+  productName: string
+  warehouseId: string
+  warehouseName: string
+  counted: number
+  stockBefore: number
+  stockAfter: number
+  diff: number
+  unit: string
+  operator: string
+  remark: string
+  createdAt: string | Date
 }
 
 export interface ProcessLogItem {
