@@ -69,7 +69,7 @@ export interface InventoryItem {
   processed: number
   loss: number
   issued: number
-  counted: number
+  counted: number | null
   minStock: number
   costPrice: number | null
   low: boolean
