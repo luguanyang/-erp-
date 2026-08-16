@@ -68,7 +68,11 @@ export default function AdminLayout() {
     item.children ? item.children.map((c) => c.key) : [item.key],
   )
   const selectedKey =
-    flatKeys.find((key) => location.pathname.startsWith(key)) || '/dashboard'
+    flatKeys.find((key) => location.pathname === key) ||
+    flatKeys
+      .filter((key) => location.pathname.startsWith(key))
+      .sort((a, b) => b.length - a.length)[0] ||
+    '/dashboard'
   const openKeys = ['inventory-group', 'store-user', 'print-manage']
 
   const userMenu = {
