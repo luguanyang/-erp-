@@ -60,6 +60,7 @@ const menuItems = [
 
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [openKeys, setOpenKeys] = useState(['inventory-group', 'store-user', 'print-manage'])
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -73,8 +74,6 @@ export default function AdminLayout() {
       .filter((key) => location.pathname.startsWith(key))
       .sort((a, b) => b.length - a.length)[0] ||
     '/dashboard'
-  const openKeys = ['inventory-group', 'store-user', 'print-manage']
-
   const userMenu = {
     items: [
       {
@@ -108,7 +107,8 @@ export default function AdminLayout() {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={openKeys}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ background: '#20242a', borderRight: 0 }}
