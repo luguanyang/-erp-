@@ -482,18 +482,18 @@ export default function Inventory() {
                     <Button
                       type="link"
                       size="small"
-                      icon={<AuditOutlined />}
-                      onClick={() => openCount(record)}
-                    >
-                      盘存
-                    </Button>
-                    <Button
-                      type="link"
-                      size="small"
                       icon={<ExperimentOutlined />}
                       onClick={() => openProcess(record)}
                     >
                       加工/损耗
+                    </Button>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<AuditOutlined />}
+                      onClick={() => openCount(record)}
+                    >
+                      盘存
                     </Button>
                     <Button type="link" size="small" onClick={() => openEdit(record)}>
                       编辑
