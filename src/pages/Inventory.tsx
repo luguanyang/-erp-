@@ -381,7 +381,7 @@ export default function Inventory() {
         operatorName: moving.type === 'in' ? values.operatorName : undefined,
         reason: values.reason,
       })
-      message.success(moving.type === 'in' ? '入库成功' : '出数成功')
+      message.success(moving.type === 'in' ? '入库成功' : '出库成功')
       setMoving(null)
       await load()
     } catch (err) {
@@ -488,7 +488,7 @@ export default function Inventory() {
                 ),
               },
               {
-                title: '出数',
+                title: '出库',
                 dataIndex: 'issued',
                 width: 90,
                 render: (value: number) => <strong>{value ?? 0}</strong>,
@@ -544,7 +544,7 @@ export default function Inventory() {
                       danger
                       onClick={() => openMove(record, 'out')}
                     >
-                      出数
+                      出库
                     </Button>
                     <Button
                       type="link"
@@ -596,7 +596,7 @@ export default function Inventory() {
         </Form>
       </Modal>
       <Modal
-        title={`${moving?.type === 'out' ? '出数' : '入库'}  · ${moving?.record.productName || ''}`}
+        title={`${moving?.type === 'out' ? '出库' : '入库'}  · ${moving?.record.productName || ''}`}
         open={!!moving}
         onCancel={() => setMoving(null)}
         onOk={() => moveForm.submit()}
@@ -609,7 +609,7 @@ export default function Inventory() {
           </Form.Item>
           <Form.Item
             name="warehouseId"
-            label={moving?.type === 'out' ? '出数仓库' : '入库仓库'}
+            label={moving?.type === 'out' ? '出库仓库' : '入库仓库'}
             rules={[{ required: true, message: '请选择仓库' }]}
           >
             <Select
