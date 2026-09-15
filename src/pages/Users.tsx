@@ -65,6 +65,10 @@ export default function Users() {
     load()
   }, [load])
 
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
+
   function openCreate() {
     setEditing(null)
     form.resetFields()

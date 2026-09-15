@@ -61,8 +61,10 @@ export default function Warehouses() {
     try {
       const res = await api.warehouseList()
       setWarehouses(res.list)
-      if (!selected && res.list.length) {
+      if ((!selected || !res.list.some((w) => w.id === selected)) && res.list.length) {
         setSelected(res.list[0].id)
+      } else if (!res.list.length) {
+        setSelected('')
       }
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载仓库失败')
@@ -104,6 +106,10 @@ export default function Warehouses() {
   useEffect(() => {
     loadInventory()
   }, [loadInventory])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
 
   async function handleCreate(values: WarehouseForm) {
     setSaving(true)

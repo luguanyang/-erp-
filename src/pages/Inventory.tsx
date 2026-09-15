@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import { AuditOutlined, ExperimentOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
 import { api } from '../api'
+import { useAuth } from '../auth/AuthContext'
 import PageHeader from '../components/PageHeader'
 import type {
   CategoryItem,
@@ -52,6 +53,7 @@ interface CountForm {
 
 export default function Inventory() {
   const navigate = useNavigate()
+  const { user: currentUser } = useAuth()
   const [form] = Form.useForm<InventoryForm>()
   const [list, setList] = useState<InventoryItem[]>([])
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([])
@@ -114,6 +116,10 @@ export default function Inventory() {
     load()
   }, [load])
 
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
+
   function openEdit(record: InventoryItem) {
     setEditing(record)
     form.setFieldsValue({
@@ -158,7 +164,7 @@ export default function Inventory() {
       price: type === 'in' ? 0 : undefined,
       warehouseId: undefined,
       inboundBy: type === 'in' ? '' : undefined,
-      operatorName: type === 'in' ? '' : undefined,
+      operatorName: type === 'in' ? currentUser?.name || '' : undefined,
       reason: '',
     })
     // 并行加载仓库列表和出库库存，避免串行等待

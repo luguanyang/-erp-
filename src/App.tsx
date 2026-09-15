@@ -15,9 +15,11 @@ import StockLogs from './pages/StockLogs'
 import ProcessLogs from './pages/ProcessLogs'
 import StockCountLogs from './pages/StockCountLogs'
 import Warehouses from './pages/Warehouses'
+import Departments from './pages/Departments'
 import Orders from './pages/Orders'
 import Users from './pages/Users'
 import Printers from './pages/Printers'
+import PrintTemplates from './pages/PrintTemplates'
 import PrintLogs from './pages/PrintLogs'
 import Statistics from './pages/Statistics'
 
@@ -57,9 +59,11 @@ const router = createHashRouter([
       { path: 'inventory/process', element: <ProcessLogs /> },
       { path: 'inventory/counts', element: <StockCountLogs /> },
       { path: 'warehouses', element: <Warehouses /> },
+      { path: 'departments', element: <Departments /> },
       { path: 'orders', element: <Orders /> },
       { path: 'users', element: <Users /> },
       { path: 'printers', element: <Printers /> },
+      { path: 'print-templates', element: <PrintTemplates /> },
       { path: 'print-logs', element: <PrintLogs /> },
       { path: 'statistics', element: <Statistics /> },
     ],

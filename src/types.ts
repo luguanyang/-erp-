@@ -26,6 +26,61 @@ export interface WarehouseItem {
   sort: number
 }
 
+export interface DepartmentItem {
+  id: string
+  name: string
+  code: string
+  remark: string
+  sort: number
+  status: 'active' | 'disabled'
+  stockCount: number
+  createdAt: string | Date
+}
+
+export interface DepartmentStockItem {
+  id: string
+  departmentId: string
+  departmentName: string
+  productId: string
+  productName: string
+  categoryKey: string
+  categoryName: string
+  subcategory: string
+  spec: string
+  stock: number
+  minStock: number
+  unit: string
+  low: boolean
+}
+
+export interface DepartmentLogItem {
+  id: string
+  logType: string
+  direction: string
+  supplier: string
+  targetName: string
+  productId: string
+  productName: string
+  unit: string
+  qty: number
+  counted: number | null
+  diff: number | null
+  price: number
+  amount: number
+  date: string
+  fromType: string
+  fromId: string
+  fromName: string
+  toType: string
+  toId: string
+  toName: string
+  operator: string
+  remark: string
+  recalled: boolean
+  recalledAt: string | Date | null
+  createdAt: string | Date
+}
+
 export interface CategoryItem {
   id: string
   key: string
@@ -44,6 +99,10 @@ export interface ProductItem {
   spec: string
   price: number
   costMultiplier: number
+  storageWarehouseId: string
+  storageWarehouseName: string
+  printGroupIds: string[]
+  printGroupNames: string[]
   unit: string
   emoji: string
   color: string
@@ -109,6 +168,7 @@ export interface StockLogItem {
   id: string
   productId: string
   productName: string
+  spec: string
   categoryKey: string
   categoryName: string
   subcategory: string
@@ -127,6 +187,45 @@ export interface StockLogItem {
   reason: string
   operator: string
   createdAt: string | Date
+}
+
+export interface StockMoveResult {
+  logId: string
+  productId: string
+  type: 'in' | 'out'
+  qty: number
+  stockBefore: number
+  stockAfter: number
+  issued: number
+  unit: string
+  productName: string
+  spec: string
+  price: number | null
+  warehouseName: string
+  inboundBy: string
+  operatorName: string
+  reason: string
+  createdAt: string | Date
+}
+
+export interface StockVoucherLine {
+  id: string
+  productName: string
+  spec: string
+  unit: string
+  qty: number
+  price: number
+  warehouseName: string
+  inboundBy: string
+  operatorName: string
+  reason: string
+  createdAt: string | Date
+}
+
+export interface StockVoucherGroup {
+  warehouseName: string
+  date: string
+  logs: StockVoucherLine[]
 }
 
 export interface OrderItem {
@@ -181,13 +280,18 @@ export interface UserItem {
 
 export interface PrinterItem {
   id: string
+  scope: 'store' | 'global'
   storeId: string
   storeName: string
   name: string
   type: string
   sn: string
+  printGroupId: string
+  printGroupName: string
   status: string
   online: boolean
+  templateOverride: PrintTemplate | null
+  hasTemplateOverride: boolean
 }
 
 export interface PrintLogItem {
@@ -195,10 +299,40 @@ export interface PrintLogItem {
   orderNo: string
   printerId: string
   printerName: string
+  sn: string
   storeName: string
   copies: number
+  labelCount: number
   status: string
+  errMsg: string
   createdAt: string | Date
+}
+
+export interface PrintTemplate {
+  headerText: string
+  titleText: string
+  footerText: string
+  showStore: boolean
+  showOrderNo: boolean
+  showTime: boolean
+  showRemark: boolean
+  showUnit: boolean
+  showPrice: boolean
+  showSubtotal: boolean
+  showTotal: boolean
+  showStorage: boolean
+  align: 'left' | 'center'
+  separator: string
+  labelWidth?: number
+  labelHeight?: number
+  fontSize?: number
+  lineGap?: number
+  emphasizeName?: boolean
+  fontSizes?: Record<string, number>
+  itemGap?: number
+  showItemIndex?: boolean
+  showCategory?: boolean
+  thermalSizes?: Record<string, number>
 }
 
 export interface PageResult<T> {

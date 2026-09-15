@@ -8,31 +8,47 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Table,
   Tag,
   message,
 } from 'antd'
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { EditOutlined, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
-import type { PrinterItem, StoreItem } from '../types'
+import PrintPreview from '../components/PrintPreview'
+import PrintTemplateFields from '../components/PrintTemplateFields'
+import { PRINT_GROUPS } from '../printGroups'
+import type { PrinterItem, PrintTemplate, StoreItem } from '../types'
 
 interface PrinterForm {
+  scope: 'store' | 'global'
   storeId: string
   name: string
   type: string
-  sn?: string
+  sn: string
+  printGroupId?: string
   status: '在线' | '离线'
 }
 
 export default function Printers() {
+  const navigate = useNavigate()
   const [form] = Form.useForm<PrinterForm>()
+  const [styleForm] = Form.useForm<PrintTemplate>()
   const [list, setList] = useState<PrinterItem[]>([])
   const [stores, setStores] = useState<StoreItem[]>([])
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<PrinterItem | null>(null)
   const [saving, setSaving] = useState(false)
+  const [stylePrinter, setStylePrinter] = useState<PrinterItem | null>(null)
+  const [styleDrawerOpen, setStyleDrawerOpen] = useState(false)
+  const [styleDefault, setStyleDefault] = useState<PrintTemplate | null>(null)
+  const [inheritDefault, setInheritDefault] = useState(true)
+  const [styleSaving, setStyleSaving] = useState(false)
+  const styleValues = Form.useWatch<PrintTemplate>([], styleForm)
+  const scope = Form.useWatch('scope', form) || 'store'
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -62,20 +78,26 @@ export default function Printers() {
     load()
   }, [load])
 
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
+
   function openCreate() {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ type: '热敏小票', status: '在线' })
+    form.setFieldsValue({ scope: 'store', type: '热敏小票', printGroupId: '', status: '在线' })
     setDrawerOpen(true)
   }
 
   function openEdit(record: PrinterItem) {
     setEditing(record)
     form.setFieldsValue({
-      storeId: record.storeId,
+      scope: record.scope === 'global' || !record.storeId ? 'global' : 'store',
+      storeId: record.scope === 'global' ? undefined : record.storeId,
       name: record.name,
       type: record.type,
       sn: record.sn,
+      printGroupId: record.printGroupId || '',
       status: record.status === '离线' ? '离线' : '在线',
     })
     setDrawerOpen(true)
@@ -118,15 +140,57 @@ export default function Printers() {
     })
   }
 
+  async function openStyle(record: PrinterItem) {
+    const kind = record.type === '标签打印' ? 'label' : 'thermal'
+    setStylePrinter(record)
+    styleForm.resetFields()
+    setInheritDefault(!record.templateOverride)
+    setStyleDefault(null)
+    try {
+      const res = await api.printTemplateGet(kind)
+      const merged = record.templateOverride
+        ? Object.assign({}, res.template, record.templateOverride)
+        : res.template
+      setStyleDefault(merged)
+      styleForm.setFieldsValue(merged)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载默认模板失败')
+    }
+    setStyleDrawerOpen(true)
+  }
+
+  async function saveStyle() {
+    if (!stylePrinter) return
+    setStyleSaving(true)
+    try {
+      await api.printerUpdate({
+        id: stylePrinter.id,
+        templateOverride: inheritDefault ? null : styleForm.getFieldsValue(),
+      })
+      setStyleDrawerOpen(false)
+      message.success('打印机样式已保存')
+      await load()
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '保存样式失败')
+    } finally {
+      setStyleSaving(false)
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="打印机管理"
         subtitle="维护各门店小票和标签打印机。"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建打印机
-          </Button>
+          <Space>
+            <Button icon={<EditOutlined />} onClick={() => navigate('/print-templates')}>
+              默认模板
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              新建打印机
+            </Button>
+          </Space>
         }
       />
       <div className="filter-bar">
@@ -143,7 +207,10 @@ export default function Printers() {
           placeholder="全部门店"
           style={{ width: 180 }}
           value={filters.storeId || undefined}
-          options={stores.map((s) => ({ value: s.id, label: s.name }))}
+          options={[
+            { value: 'global', label: '全局共享' },
+            ...stores.map((s) => ({ value: s.id, label: s.name })),
+          ]}
           onChange={(value) => setFilters((f) => ({ ...f, storeId: value || '' }))}
         />
         <Select
@@ -177,10 +244,26 @@ export default function Printers() {
               },
             }}
             columns={[
-              { title: '门店', dataIndex: 'storeName', width: 160 },
+              {
+                title: '门店',
+                dataIndex: 'storeName',
+                width: 160,
+                render: (value: string, record: PrinterItem) =>
+                  record.scope === 'global' ? <Tag color="orange">全局</Tag> : value,
+              },
               { title: '名称', dataIndex: 'name' },
               { title: '类型', dataIndex: 'type', width: 120 },
               { title: '设备号', dataIndex: 'sn', width: 160 },
+              {
+                title: '出单分组',
+                dataIndex: 'printGroupId',
+                width: 120,
+                render: (value: string) => {
+                  if (!value) return <span style={{ color: '#9ca3af' }}>全部订单</span>
+                  const group = PRINT_GROUPS.find((g) => g.value === value)
+                  return group ? <Tag color={group.color}>{group.label}</Tag> : value
+                },
+              },
               {
                 title: '状态',
                 dataIndex: 'status',
@@ -191,9 +274,12 @@ export default function Printers() {
               },
               {
                 title: '操作',
-                width: 160,
+                width: 220,
                 render: (_, record) => (
                   <Space>
+                    <Button type="link" size="small" icon={<SettingOutlined />} onClick={() => openStyle(record)}>
+                      样式
+                    </Button>
                     <Button type="link" size="small" onClick={() => openEdit(record)}>
                       编辑
                     </Button>
@@ -215,13 +301,26 @@ export default function Printers() {
         destroyOnClose
       >
         <Form<PrinterForm> form={form} layout="vertical" onFinish={handleFinish}>
-          <Form.Item name="storeId" label="所属门店" rules={[{ required: true, message: '请选择门店' }]}>
+          <Form.Item name="scope" label="使用范围" rules={[{ required: true, message: '请选择使用范围' }]}>
             <Select
-              showSearch
-              optionFilterProp="label"
-              options={stores.map((s) => ({ value: s.id, label: s.name }))}
+              options={[
+                { value: 'store', label: '指定门店' },
+                { value: 'global', label: '全局共享' },
+              ]}
+              onChange={(value: 'store' | 'global') => {
+                if (value === 'global') form.setFieldsValue({ storeId: undefined })
+              }}
             />
           </Form.Item>
+          {scope === 'store' ? (
+            <Form.Item name="storeId" label="所属门店" rules={[{ required: true, message: '请选择门店' }]}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={stores.map((s) => ({ value: s.id, label: s.name }))}
+              />
+            </Form.Item>
+          ) : null}
           <Form.Item name="name" label="打印机名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如 前台小票机" />
           </Form.Item>
@@ -233,8 +332,17 @@ export default function Printers() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="sn" label="设备编号">
-            <Input placeholder="请输入设备编号" />
+          <Form.Item name="sn" label="飞鹅设备编号 (SN)" rules={[{ required: true, message: '请输入飞鹅设备编号' }]}>
+            <Input placeholder="如 918800000" />
+          </Form.Item>
+          <Form.Item name="printGroupId" label="出单分组">
+            <Select
+              placeholder="全部订单"
+              options={[
+                { value: '', label: '全部订单' },
+                ...PRINT_GROUPS.map((g) => ({ value: g.value, label: g.label })),
+              ]}
+            />
           </Form.Item>
           <Form.Item name="status" label="状态">
             <Select
@@ -251,6 +359,55 @@ export default function Printers() {
             </Button>
           </Space>
         </Form>
+      </Drawer>
+      <Drawer
+        title={stylePrinter ? `打印样式 · ${stylePrinter.name}` : '打印样式'}
+        width={680}
+        open={styleDrawerOpen}
+        onClose={() => setStyleDrawerOpen(false)}
+      >
+        <div className="style-inherit-row">
+          <div>
+            <strong>继承默认模板</strong>
+            <div className="style-inherit-desc">开启后使用“打印模板”页的统一样式</div>
+          </div>
+          <Switch checked={inheritDefault} onChange={setInheritDefault} />
+        </div>
+        {inheritDefault ? (
+          <>
+            <div className="panel-card style-inherit-tip">
+              该打印机将使用“打印模板”页的默认样式，可点击顶部“默认模板”统一调整。
+            </div>
+            <div className="preview-stage compact">
+              <PrintPreview
+                type={stylePrinter?.type === '标签打印' ? 'label' : 'thermal'}
+                template={styleDefault || undefined}
+                height={280}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <Form<PrintTemplate> form={styleForm} layout="vertical">
+              <PrintTemplateFields type={stylePrinter?.type === '标签打印' ? 'label' : 'thermal'} />
+            </Form>
+            <div className="preview-stage compact">
+              <PrintPreview
+                type={stylePrinter?.type === '标签打印' ? 'label' : 'thermal'}
+                template={styleValues}
+                height={280}
+              />
+            </div>
+          </>
+        )}
+        <div className="drawer-footer">
+          <Space>
+            <Button onClick={() => setStyleDrawerOpen(false)}>取消</Button>
+            <Button type="primary" loading={styleSaving} onClick={saveStyle}>
+              保存样式
+            </Button>
+          </Space>
+        </div>
       </Drawer>
     </>
   )

@@ -1,0 +1,145 @@
+import { createPortal } from 'react-dom'
+import { Button, Space } from 'antd'
+import { CloseOutlined, PrinterOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
+import type { StockVoucherGroup } from '../types'
+
+interface StockVoucherPrintProps {
+  open: boolean
+  groups: StockVoucherGroup[]
+  onClose: () => void
+}
+
+export default function StockVoucherPrint({
+  open,
+  groups,
+  onClose,
+}: StockVoucherPrintProps) {
+  if (!open) return null
+
+  const totalLogs = groups.reduce((sum, group) => sum + group.logs.length, 0)
+
+  return createPortal(
+    <div className="stock-voucher-overlay">
+      <div className="stock-voucher-toolbar">
+        <div>
+          <strong>入库报销凭证</strong>
+          <span className="stock-voucher-toolbar-desc">
+            {totalLogs > 1
+              ? `共 ${totalLogs} 条入库记录，${groups.length} 张凭证`
+              : '单条入库记录'}
+          </span>
+        </div>
+        <Space>
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => window.print()}
+          >
+            打印凭证
+          </Button>
+          <Button icon={<CloseOutlined />} onClick={onClose}>
+            关闭
+          </Button>
+        </Space>
+      </div>
+      <div className="stock-voucher-print">
+        {groups.map((group, groupIndex) => {
+          const totalQty = group.logs.reduce(
+            (sum, log) => sum + Number(log.qty || 0),
+            0,
+          )
+          const totalAmount = group.logs.reduce(
+            (sum, log) => sum + Number(log.price || 0) * Number(log.qty || 0),
+            0,
+          )
+          return (
+            <div
+              className="stock-voucher-page"
+              key={`${group.warehouseName}-${group.date}-${groupIndex}`}
+            >
+              <h2 className="stock-voucher-title">入库报销凭证</h2>
+              <div className="stock-voucher-subtitle">
+                {totalLogs > 1 ? '（汇总）' : '（单条）'}
+              </div>
+              <div className="stock-voucher-meta">
+                <span>仓库：{group.warehouseName || '默认仓库'}</span>
+                <span>日期：{group.date}</span>
+                <span>打印时间：{dayjs().format('YYYY-MM-DD HH:mm')}</span>
+              </div>
+              <table className="stock-voucher-table">
+                <thead>
+                  <tr>
+                    <th className="stock-voucher-col-index">序号</th>
+                    <th>商品 / 规格</th>
+                    <th className="stock-voucher-col-unit">单位</th>
+                    <th className="stock-voucher-col-qty">数量</th>
+                    <th className="stock-voucher-col-price">单价（元）</th>
+                    <th className="stock-voucher-col-amount">金额（元）</th>
+                    <th>申报人</th>
+                    <th>操作员</th>
+                    <th>备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.logs.map((log, index) => {
+                    const amount = Number(log.price || 0) * Number(log.qty || 0)
+                    return (
+                      <tr key={log.id || `${group.date}-${index}`}>
+                        <td className="stock-voucher-center">{index + 1}</td>
+                        <td>
+                          {log.productName}
+                          {log.spec ? `（${log.spec}）` : ''}
+                        </td>
+                        <td className="stock-voucher-center">{log.unit || '件'}</td>
+                        <td className="stock-voucher-center">
+                          {Number(log.qty || 0)}
+                        </td>
+                        <td className="stock-voucher-right">
+                          {Number(log.price || 0).toFixed(2)}
+                        </td>
+                        <td className="stock-voucher-right">
+                          {amount.toFixed(2)}
+                        </td>
+                        <td>{log.inboundBy || '-'}</td>
+                        <td>{log.operatorName || '-'}</td>
+                        <td>{log.reason || '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} className="stock-voucher-total-label">
+                      合计
+                    </td>
+                    <td className="stock-voucher-center">{totalQty}</td>
+                    <td />
+                    <td className="stock-voucher-right">
+                      {totalAmount.toFixed(2)}
+                    </td>
+                    <td colSpan={3} />
+                  </tr>
+                </tfoot>
+              </table>
+              <div className="stock-voucher-note">
+                共 {group.logs.length} 条入库记录
+                {group.logs.length === 1 && group.logs[0].id
+                  ? `，流水号：${group.logs[0].id}`
+                  : ''}
+              </div>
+              <div className="stock-voucher-sign">
+                <span>领货人签字：______________</span>
+                <span>报销人签字：______________</span>
+              </div>
+              <div className="stock-voucher-sign stock-voucher-sign-second">
+                仓库负责人签字：______________
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>,
+    document.body,
+  )
+}

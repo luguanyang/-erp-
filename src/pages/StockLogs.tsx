@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type Key } from 'react'
 import {
   Button,
+  DatePicker,
   Input,
   Modal,
   Select,
@@ -10,19 +11,36 @@ import {
   Tag,
   message,
 } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { PrinterOutlined, SearchOutlined } from '@ant-design/icons'
+import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
-import type { CategoryItem, StockLogItem } from '../types'
+import StockVoucherPrint from '../components/StockVoucherPrint'
+import type {
+  CategoryItem,
+  StockLogItem,
+  StockVoucherGroup,
+  StockVoucherLine,
+  WarehouseItem,
+} from '../types'
 
 export default function StockLogs() {
   const [list, setList] = useState<StockLogItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseItem[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [filters, setFilters] = useState({ keyword: '', type: '', category: '', subcategory: '' })
+  const [voucherOpen, setVoucherOpen] = useState(false)
+  const [voucherGroups, setVoucherGroups] = useState<StockVoucherGroup[]>([])
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryWarehouseId, setSummaryWarehouseId] = useState('')
+  const [summaryRange, setSummaryRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [selectedLogs, setSelectedLogs] = useState<StockLogItem[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -42,13 +60,135 @@ export default function StockLogs() {
   }, [load])
 
   useEffect(() => {
+    setPage(1)
+  }, [filters])
+
+  useEffect(() => {
     api
       .categoryList()
       .then((res) => setCategories(res.list))
       .catch(() => undefined)
   }, [])
 
+  useEffect(() => {
+    api
+      .warehouseList()
+      .then((res) => setWarehouses(res.list))
+      .catch(() => undefined)
+  }, [])
+
   const currentCategory = categories.find((c) => c.key === filters.category)
+
+  function toVoucherLine(record: StockLogItem): StockVoucherLine {
+    return {
+      id: record.id,
+      productName: record.productName,
+      spec: record.spec,
+      unit: record.unit,
+      qty: record.qty,
+      price: Number(record.price || 0),
+      warehouseName: record.warehouseName,
+      inboundBy: record.inboundBy,
+      operatorName: record.operatorName,
+      reason: record.reason,
+      createdAt: record.createdAt,
+    }
+  }
+
+  function openVoucher(record: StockLogItem) {
+    setVoucherGroups([
+      {
+        warehouseName: record.warehouseName || '默认仓库',
+        date: dayjs(record.createdAt).format('YYYY-MM-DD'),
+        logs: [toVoucherLine(record)],
+      },
+    ])
+    setVoucherOpen(true)
+  }
+
+  function buildVoucherGroups(logs: StockLogItem[]): StockVoucherGroup[] {
+    const groupMap = new Map<string, StockVoucherGroup>()
+    logs
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      )
+      .forEach((log) => {
+        const date = dayjs(log.createdAt).format('YYYY-MM-DD')
+        const warehouseName = log.warehouseName || '默认仓库'
+        const key = `${warehouseName}__${date}`
+        if (!groupMap.has(key)) {
+          groupMap.set(key, { warehouseName, date, logs: [] })
+        }
+        groupMap.get(key)?.logs.push(toVoucherLine(log))
+      })
+    return Array.from(groupMap.values())
+  }
+
+  function handleSelectionChange(nextKeys: Key[], nextRows: StockLogItem[]) {
+    const keySet = new Set(nextKeys.map(String))
+    setSelectedRowKeys(nextKeys)
+    setSelectedLogs((prev) => {
+      const merged = new Map<string, StockLogItem>()
+      prev.forEach((row) => merged.set(row.id, row))
+      nextRows.forEach((row) => merged.set(row.id, row))
+      return Array.from(merged.values()).filter((row) => keySet.has(row.id))
+    })
+  }
+
+  function printSelected() {
+    const selected = selectedLogs.filter(
+      (record) => record.type === 'in' && !record.recalled,
+    )
+    if (!selected.length) {
+      message.warning('请先勾选要打印的入库商品')
+      return
+    }
+    setVoucherGroups(buildVoucherGroups(selected))
+    setVoucherOpen(true)
+  }
+
+  async function runSummary() {
+    if (!summaryRange || !summaryRange[0] || !summaryRange[1]) {
+      message.warning('请先选择日期范围')
+      return
+    }
+    setSummaryLoading(true)
+    try {
+      const logs: StockLogItem[] = []
+      let page = 1
+      let fetchedCount = 0
+      let total = 1
+      do {
+        const res = await api.stockLogList({
+          type: 'in',
+          warehouseId: summaryWarehouseId || undefined,
+          startDate: summaryRange[0].startOf('day').toISOString(),
+          endDate: summaryRange[1].endOf('day').toISOString(),
+          page,
+          pageSize: 200,
+        })
+        fetchedCount += res.list.length
+        logs.push(...res.list.filter((log) => !log.recalled))
+        total = res.total
+        page += 1
+      } while (fetchedCount < total && page <= 100)
+
+      if (!logs.length) {
+        message.info('该条件下没有可打印的入库记录')
+        return
+      }
+
+      setVoucherGroups(buildVoucherGroups(logs))
+      setSummaryOpen(false)
+      setVoucherOpen(true)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '生成汇总凭证失败')
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
 
   function confirmRecall(record: StockLogItem) {
     Modal.confirm({
@@ -68,11 +208,35 @@ export default function StockLogs() {
     })
   }
 
+  const validSelectedCount = selectedLogs.filter(
+    (record) => record.type === 'in' && !record.recalled,
+  ).length
+
   return (
     <>
       <PageHeader
         title="出入库记录"
         subtitle="查看全部入库/出库流水，包括仓库、价格、操作人与时间。"
+        extra={
+          <Space>
+            <Button
+              icon={<PrinterOutlined />}
+              disabled={validSelectedCount === 0}
+              onClick={printSelected}
+            >
+              打印选中{validSelectedCount ? `（${validSelectedCount}）` : ''}
+            </Button>
+            <Button
+              icon={<PrinterOutlined />}
+              onClick={() => {
+                setSummaryRange([dayjs().startOf('day'), dayjs()])
+                setSummaryOpen(true)
+              }}
+            >
+              打印汇总凭证
+            </Button>
+          </Space>
+        }
       />
       <div className="panel-card">
         <div className="filter-bar">
@@ -121,6 +285,14 @@ export default function StockLogs() {
           <Table<StockLogItem>
             rowKey="id"
             dataSource={list}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: handleSelectionChange,
+              preserveSelectedRowKeys: true,
+              getCheckboxProps: (record) => ({
+                disabled: record.type !== 'in' || record.recalled,
+              }),
+            }}
             pagination={{
               current: page,
               pageSize,
@@ -183,20 +355,75 @@ export default function StockLogs() {
               },
               {
                 title: '操作',
-                width: 120,
+                width: 190,
                 render: (_, record) =>
                   record.recalled ? (
                     <Tag color="default">已撤回</Tag>
                   ) : (
-                    <Button type="link" size="small" danger onClick={() => confirmRecall(record)}>
-                      撤回
-                    </Button>
+                    <Space size={0}>
+                      {record.type === 'in' ? (
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<PrinterOutlined />}
+                          onClick={() => openVoucher(record)}
+                        >
+                          打印凭证
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="link"
+                        size="small"
+                        danger
+                        onClick={() => confirmRecall(record)}
+                      >
+                        撤回
+                      </Button>
+                    </Space>
                   ),
               },
             ]}
           />
         </Spin>
       </div>
+      <Modal
+        title="打印入库汇总凭证"
+        open={summaryOpen}
+        onCancel={() => setSummaryOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <div className="filter-bar">
+          <DatePicker.RangePicker
+            value={summaryRange}
+            onChange={(dates) =>
+              setSummaryRange(
+                dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null,
+              )
+            }
+          />
+          <Select
+            allowClear
+            placeholder="全部仓库"
+            style={{ width: 180 }}
+            value={summaryWarehouseId || undefined}
+            options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+            onChange={(value) => setSummaryWarehouseId(value || '')}
+          />
+          <Button
+            type="primary"
+            loading={summaryLoading}
+            onClick={runSummary}
+          >
+            生成并打印
+          </Button>
+        </div>
+      </Modal>
+      <StockVoucherPrint
+        open={voucherOpen}
+        groups={voucherGroups}
+        onClose={() => setVoucherOpen(false)}
+      />
     </>
   )
 }

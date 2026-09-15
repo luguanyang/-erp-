@@ -3,6 +3,9 @@ import type {
   AdminProfile,
   CategoryItem,
   DashboardStats,
+  DepartmentItem,
+  DepartmentLogItem,
+  DepartmentStockItem,
   InventoryItem,
   OrderDetailData,
   OrderItem,
@@ -11,17 +14,20 @@ import type {
   StockLogItem,
   PrinterItem,
   PrintLogItem,
+  PrintTemplate,
   ProductItem,
   StatsSummary,
   StockCountLogItem,
   StoreDetailData,
   StoreItem,
+  StockMoveResult,
   UserItem,
   WarehouseItem,
 } from './types'
 
 export const api = {
-  profile: () => callAdmin<AdminProfile>({ action: 'admin.profile' }),
+  profile: (authUsername?: string) =>
+    callAdmin<AdminProfile>({ action: 'admin.profile', authUsername: authUsername || '' }),
 
   dashboardStats: () => callAdmin<DashboardStats>({ action: 'dashboard.stats' }),
 
@@ -44,6 +50,31 @@ export const api = {
   warehouseInventory: (data: object) =>
     callAdmin<PageResult<InventoryItem>>({ action: 'warehouse.inventory', ...data }),
 
+  departmentList: () => callAdmin<{ list: DepartmentItem[] }>({ action: 'department.list' }),
+  departmentCreate: (data: object) =>
+    callAdmin<{ id: string }>({ action: 'department.create', ...data }),
+  departmentUpdate: (data: object) =>
+    callAdmin<{ id: string }>({ action: 'department.update', ...data }),
+  departmentDelete: (id: string) =>
+    callAdmin<{ id: string; deleted: boolean }>({ action: 'department.delete', id }),
+  departmentReorder: (ids: string[]) =>
+    callAdmin<{ updated: number }>({ action: 'department.reorder', ids }),
+  departmentStock: (data: object) =>
+    callAdmin<PageResult<DepartmentStockItem>>({ action: 'department.stock', ...data }),
+  departmentPurchase: (data: object) =>
+    callAdmin<{ handled: number }>({ action: 'department.purchase', ...data }),
+  departmentMove: (data: object) =>
+    callAdmin<{ handled: number }>({ action: 'department.move', ...data }),
+  departmentCount: (data: object) =>
+    callAdmin<{ handled: number }>({ action: 'department.count', ...data }),
+  departmentLogs: (data: object) =>
+    callAdmin<PageResult<DepartmentLogItem>>({ action: 'department.logs', ...data }),
+  departmentLogRecall: (id: string) =>
+    callAdmin<{ id: string; recalled: boolean }>({
+      action: 'department.logs.recall',
+      id,
+    }),
+
   categoryList: () => callAdmin<{ list: CategoryItem[] }>({ action: 'category.list' }),
   categoryCreate: (data: object) =>
     callAdmin<{ id: string }>({ action: 'category.create', ...data }),
@@ -64,7 +95,7 @@ export const api = {
   inventoryUpdate: (items: object[]) =>
     callAdmin<{ updated: number }>({ action: 'inventory.update', items }),
   stockMove: (data: object) =>
-    callAdmin<{ productId: string; type: string; qty: number; stockBefore: number; stockAfter: number }>({
+    callAdmin<StockMoveResult>({
       action: 'stock.move',
       ...data,
     }),
@@ -118,10 +149,31 @@ export const api = {
   printerDelete: (id: string) => callAdmin<{ id: string }>({ action: 'printer.delete', id }),
 
   printSend: (data: object) =>
-    callAdmin<{ sent: number }>({ action: 'print.send', ...data }),
+    callAdmin<{ sent: number; failed: number; errMsg?: string }>({
+      action: 'print.send',
+      ...data,
+    }),
 
   printLogList: (data: object) =>
     callAdmin<PageResult<PrintLogItem>>({ action: 'printLog.list', ...data }),
+
+  printTemplateGet: (type: 'thermal' | 'label') =>
+    callAdmin<{ type: 'thermal' | 'label'; template: PrintTemplate }>({
+      action: 'printTemplate.get',
+      type,
+    }),
+  printTemplateUpdate: (type: 'thermal' | 'label', template: PrintTemplate) =>
+    callAdmin<{ type: 'thermal' | 'label'; template: PrintTemplate }>({
+      action: 'printTemplate.update',
+      type,
+      template,
+    }),
+  printTemplatePreview: (type: 'thermal' | 'label', template: PrintTemplate) =>
+    callAdmin<{ type: 'thermal' | 'label'; content: string; contents: string[]; apiname: string }>({
+      action: 'printTemplate.preview',
+      type,
+      template,
+    }),
 
   statsProductSummary: (data: object) =>
     callAdmin<StatsSummary>({ action: 'stats.productSummary', ...data }),

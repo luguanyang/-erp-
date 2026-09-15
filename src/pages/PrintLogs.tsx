@@ -31,6 +31,10 @@ export default function PrintLogs() {
     load()
   }, [load])
 
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
+
   return (
     <>
       <PageHeader title="打印记录" subtitle="查看订单打印历史和状态。" />
@@ -78,6 +82,7 @@ export default function PrintLogs() {
               { title: '打印机', dataIndex: 'printerName' },
               { title: '门店', dataIndex: 'storeName', width: 160 },
               { title: '份数', dataIndex: 'copies', width: 80, align: 'right' },
+              { title: '标签数', dataIndex: 'labelCount', width: 90, align: 'right', render: (value: number) => value || 1 },
               {
                 title: '状态',
                 dataIndex: 'status',
@@ -85,6 +90,12 @@ export default function PrintLogs() {
                 render: (status: string) => (
                   <Tag color={status === '成功' ? 'green' : 'red'}>{status}</Tag>
                 ),
+              },
+              {
+                title: '失败原因',
+                dataIndex: 'errMsg',
+                width: 220,
+                render: (value: string) => value || '-',
               },
               {
                 title: '打印时间',

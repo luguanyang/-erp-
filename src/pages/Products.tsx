@@ -18,7 +18,8 @@ import {
 import { DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
-import type { CategoryItem, ProductItem } from '../types'
+import { PRINT_GROUPS } from '../printGroups'
+import type { CategoryItem, ProductItem, WarehouseItem } from '../types'
 
 interface ProductForm {
   name: string
@@ -27,6 +28,8 @@ interface ProductForm {
   spec?: string
   price: number
   costMultiplier: number
+  storageWarehouseId?: string
+  printGroupIds?: string[]
   unit: string
   emoji?: string
   color?: string
@@ -45,8 +48,10 @@ interface ProductFilter {
 
 export default function Products() {
   const [form] = Form.useForm<ProductForm>()
+  const watchedCategoryKey = Form.useWatch('categoryKey', form)
   const [list, setList] = useState<ProductItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseItem[]>([])
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<ProductItem | null>(null)
@@ -89,8 +94,19 @@ export default function Products() {
   }, [])
 
   useEffect(() => {
+    api
+      .warehouseList()
+      .then((res) => setWarehouses(res.list))
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
 
   const currentCategory = categories.find((c) => c.key === filters.category)
 
@@ -102,6 +118,7 @@ export default function Products() {
       unit: '斤',
       price: 0,
       costMultiplier: 1,
+      printGroupIds: [],
       sort: 0,
       outOfStock: false,
       status: 'active',
@@ -118,6 +135,8 @@ export default function Products() {
       spec: record.spec,
       price: record.price,
       costMultiplier: record.costMultiplier || 1,
+      storageWarehouseId: record.storageWarehouseId || undefined,
+      printGroupIds: record.printGroupIds || [],
       unit: record.unit,
       emoji: record.emoji,
       color: record.color,
@@ -304,6 +323,33 @@ export default function Products() {
                 ),
               },
               {
+                title: '暂存仓库',
+                dataIndex: 'storageWarehouseName',
+                width: 130,
+                render: (value: string) =>
+                  value ? <Tag color="blue">{value}</Tag> : <span style={{ color: '#9ca3af' }}>未设置</span>,
+              },
+              {
+                title: '出单分组',
+                dataIndex: 'printGroupIds',
+                width: 150,
+                render: (_: unknown, record: ProductItem) =>
+                  record.printGroupIds?.length ? (
+                    <Space size={4}>
+                      {record.printGroupIds.map((id) => {
+                        const group = PRINT_GROUPS.find((g) => g.value === id)
+                        return group ? (
+                          <Tag key={id} color={group.color}>
+                            {group.label}
+                          </Tag>
+                        ) : null
+                      })}
+                    </Space>
+                  ) : (
+                    <span style={{ color: '#9ca3af' }}>未设置</span>
+                  ),
+              },
+              {
                 title: '状态',
                 dataIndex: 'status',
                 width: 90,
@@ -368,13 +414,11 @@ export default function Products() {
           <Form.Item
             name="subcategory"
             label="子分类"
-            dependencies={['categoryKey']}
           >
             <Select
               allowClear
               options={(
-                categories.find((c) => c.key === form.getFieldValue('categoryKey'))?.subcategories ||
-                []
+                categories.find((c) => c.key === watchedCategoryKey)?.subcategories || []
               ).map((s) => ({ value: s, label: s }))}
             />
           </Form.Item>
@@ -409,6 +453,21 @@ export default function Products() {
           </Space>
           <Form.Item name="image" label="图片地址">
             <Input placeholder="https://..." />
+          </Form.Item>
+          <Form.Item name="storageWarehouseId" label="暂存仓库">
+            <Select
+              allowClear
+              placeholder="仅用于打印提示，不参与库存"
+              options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+            />
+          </Form.Item>
+          <Form.Item name="printGroupIds" label="出单分组">
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="可选，打印时只发送到对应分组打印机"
+              options={PRINT_GROUPS.map((g) => ({ value: g.value, label: g.label }))}
+            />
           </Form.Item>
           <Form.Item name="sort" label="排序">
             <InputNumber min={0} style={{ width: '100%' }} />

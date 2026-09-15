@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(result.error?.message || '账号或密码错误')
     }
     try {
-      const profile = await api.profile()
+      const profile = await api.profile(username)
       setUser(profile)
       return profile
     } catch (error) {

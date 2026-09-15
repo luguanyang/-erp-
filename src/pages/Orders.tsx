@@ -82,6 +82,10 @@ export default function Orders() {
     load()
   }, [load])
 
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
+
   async function openDetail(orderNo: string) {
     setDetailLoading(true)
     try {
@@ -143,12 +147,16 @@ export default function Orders() {
     }
     setPrintLoading(true)
     try {
-      await api.printSend({
+      const res = await api.printSend({
         orderNo: printOrderNo,
         printerIds: selectedPrinterIds,
         copies,
       })
-      message.success('打印任务已发送')
+      if (res.failed) {
+        message.warning(res.errMsg || `${res.sent} 台成功，${res.failed} 台失败`)
+      } else {
+        message.success('打印任务已发送')
+      }
       setPrintOpen(false)
       if (detail && detail.order.orderNo === printOrderNo) {
         await openDetail(printOrderNo)

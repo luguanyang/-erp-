@@ -7,6 +7,7 @@ import {
   BarChartOutlined,
   DatabaseOutlined,
   DashboardOutlined,
+  EditOutlined,
   ExperimentOutlined,
   FileTextOutlined,
   LogoutOutlined,
@@ -36,6 +37,7 @@ const menuItems = [
     ],
   },
   { key: '/warehouses', icon: <DatabaseOutlined />, label: '仓库' },
+  { key: '/departments', icon: <DatabaseOutlined />, label: '部门' },
   { key: '/orders', icon: <FileTextOutlined />, label: '订单' },
   { key: '/statistics', icon: <BarChartOutlined />, label: '下单统计' },
   {
@@ -53,6 +55,7 @@ const menuItems = [
     label: '打印管理',
     children: [
       { key: '/printers', icon: <PrinterOutlined />, label: '打印机' },
+      { key: '/print-templates', icon: <EditOutlined />, label: '打印模板' },
       { key: '/print-logs', icon: <FileTextOutlined />, label: '打印记录' },
     ],
   },
