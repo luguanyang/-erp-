@@ -581,7 +581,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 241mm;
+  max-width: 210mm;
   margin: 0 auto 16px;
   padding: 12px 16px;
   background: #ffffff;
@@ -598,7 +598,7 @@ body {
 }
 
 .stock-voucher-print {
-  width: 241mm;
+  width: 210mm;
   margin: 0 auto;
   background: #ffffff;
   color: #111111;
@@ -705,13 +705,13 @@ body {
 
 @media print {
   @page {
-    size: 241mm 93mm;
+    size: 210mm 93mm;
     margin: 0;
   }
 
   html,
   body {
-    width: 241mm;
+    width: 210mm;
     height: auto;
     margin: 0;
     padding: 0;
@@ -740,7 +740,7 @@ body {
 
   .stock-voucher-print {
     position: static;
-    width: 241mm;
+    width: 210mm;
     margin: 0;
     box-shadow: none;
   }

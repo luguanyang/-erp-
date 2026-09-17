@@ -22,6 +22,16 @@ const TYPE_LABELS: Record<string, string> = {
   purchase_return: '采购退货',
 }
 
+const ITEMS_PER_PAGE = 5
+
+function chunk<T>(items: T[], size: number) {
+  const result: T[][] = []
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size))
+  }
+  return result
+}
+
 export default function PurchaseVoucherPrint({
   open,
   groups,
@@ -29,6 +39,15 @@ export default function PurchaseVoucherPrint({
 }: PurchaseVoucherPrintProps) {
   if (!open) return null
 
+  const pages = groups.flatMap((group) => {
+    const chunks = chunk(group.logs, ITEMS_PER_PAGE)
+    return chunks.map((logs, pageIndex) => ({
+      ...group,
+      logs,
+      pageIndex,
+      pageCount: chunks.length,
+    }))
+  })
   const totalLogs = groups.reduce((sum, group) => sum + group.logs.length, 0)
 
   return createPortal(
@@ -38,7 +57,7 @@ export default function PurchaseVoucherPrint({
           <strong>采购流水凭证</strong>
           <span className="stock-voucher-toolbar-desc">
             {totalLogs > 1
-              ? `共 ${totalLogs} 条采购记录，${groups.length} 张凭证`
+              ? `共 ${totalLogs} 条采购记录，${pages.length} 张凭证`
               : '单条采购记录'}
           </span>
         </div>
@@ -56,28 +75,33 @@ export default function PurchaseVoucherPrint({
         </Space>
       </div>
       <div className="stock-voucher-print">
-        {groups.map((group, groupIndex) => {
-          const totalQty = group.logs.reduce(
+        {pages.map((page, pageIndex) => {
+          const totalQty = page.logs.reduce(
             (sum, log) => sum + Number(log.qty || 0),
             0,
           )
-          const totalAmount = group.logs.reduce(
+          const totalAmount = page.logs.reduce(
             (sum, log) => sum + Number(log.amount || 0),
             0,
           )
           return (
             <div
               className="stock-voucher-page"
-              key={`${group.warehouseName}-${group.date}-${groupIndex}`}
+              key={`${page.warehouseName}-${page.date}-${pageIndex}-${page.pageIndex}`}
             >
               <h2 className="stock-voucher-title">采购流水凭证</h2>
               <div className="stock-voucher-subtitle">
                 {totalLogs > 1 ? '（汇总）' : '（单条）'}
               </div>
               <div className="stock-voucher-meta">
-                <span>仓库/部门：{group.warehouseName || '默认'}</span>
-                <span>日期：{group.date}</span>
+                <span>仓库/部门：{page.warehouseName || '默认'}</span>
+                <span>日期：{page.date}</span>
                 <span>打印时间：{dayjs().format('YYYY-MM-DD HH:mm')}</span>
+                {page.pageCount > 1 ? (
+                  <span>
+                    第 {page.pageIndex + 1} / {page.pageCount} 张
+                  </span>
+                ) : null}
               </div>
               <table className="stock-voucher-table">
                 <thead>
@@ -94,8 +118,8 @@ export default function PurchaseVoucherPrint({
                   </tr>
                 </thead>
                 <tbody>
-                  {group.logs.map((log, index) => (
-                    <tr key={log.id || `${group.date}-${index}`}>
+                  {page.logs.map((log, index) => (
+                    <tr key={log.id || `${page.date}-${index}`}>
                       <td className="stock-voucher-center">{index + 1}</td>
                       <td>{TYPE_LABELS[log.logType] || log.logType}</td>
                       <td>
@@ -132,9 +156,9 @@ export default function PurchaseVoucherPrint({
                 </tfoot>
               </table>
               <div className="stock-voucher-note">
-                共 {group.logs.length} 条采购记录
-                {group.logs.length === 1 && group.logs[0].id
-                  ? `，流水号：${group.logs[0].id}`
+                本页 {page.logs.length} 条采购记录
+                {page.logs.length === 1 && page.logs[0].id
+                  ? `，流水号：${page.logs[0].id}`
                   : ''}
               </div>
               <div className="stock-voucher-sign">
