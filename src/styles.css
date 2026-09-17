@@ -718,8 +718,9 @@ body {
     background: #ffffff !important;
   }
 
-  body * {
-    visibility: hidden !important;
+  #root,
+  body > :not(.stock-voucher-overlay) {
+    display: none !important;
   }
 
   .stock-voucher-overlay,
@@ -728,9 +729,13 @@ body {
   }
 
   .stock-voucher-overlay {
-    position: static;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 210mm;
     overflow: visible;
     padding: 0;
+    margin: 0;
     background: #ffffff;
   }
 
