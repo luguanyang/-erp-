@@ -1365,7 +1365,13 @@ export default function Departments() {
                         min={0}
                         placeholder="数量"
                         style={{ width: '100%' }}
-                        onChange={(value) => syncPurchaseRow(field.name, 'qty', value)}
+                        onBlur={() =>
+                          syncPurchaseRow(
+                            field.name,
+                            'qty',
+                            purchaseForm.getFieldValue(['items', field.name, 'qty']),
+                          )
+                        }
                       />
                     </Form.Item>
                     <Form.Item className="dept-entry-field" name={[field.name, 'price']}>
@@ -1374,7 +1380,13 @@ export default function Departments() {
                         precision={2}
                         placeholder="单价"
                         style={{ width: '100%' }}
-                        onChange={(value) => syncPurchaseRow(field.name, 'price', value)}
+                        onBlur={() =>
+                          syncPurchaseRow(
+                            field.name,
+                            'price',
+                            purchaseForm.getFieldValue(['items', field.name, 'price']),
+                          )
+                        }
                       />
                     </Form.Item>
                     <Form.Item className="dept-entry-field" name={[field.name, 'amount']}>
@@ -1383,7 +1395,13 @@ export default function Departments() {
                         precision={2}
                         placeholder="总额"
                         style={{ width: '100%' }}
-                        onChange={(value) => syncPurchaseRow(field.name, 'amount', value)}
+                        onBlur={() =>
+                          syncPurchaseRow(
+                            field.name,
+                            'amount',
+                            purchaseForm.getFieldValue(['items', field.name, 'amount']),
+                          )
+                        }
                       />
                     </Form.Item>
                     <Form.Item className="dept-entry-field" name={[field.name, 'remark']}>
