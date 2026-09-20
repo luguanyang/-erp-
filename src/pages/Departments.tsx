@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Key } from 'react'
+import { useCallback, useEffect, useRef, useState, type Key } from 'react'
 import {
   Button,
   DatePicker,
@@ -146,6 +146,38 @@ export default function Departments() {
   const countDepartmentId = Form.useWatch('departmentId', countForm)
 
   const purchaseTargetType = Form.useWatch('targetType', purchaseForm)
+  const purchaseEntryRefs = useRef<Record<string, { focus?: () => void } | null>>({})
+
+  function setPurchaseEntryRef(key: string) {
+    return (node: { focus?: () => void } | null) => {
+      purchaseEntryRefs.current[key] = node && typeof node.focus === 'function' ? node : null
+    }
+  }
+
+  function focusPurchaseEntry(index: number, field: string) {
+    const node = purchaseEntryRefs.current[`${index}-${field}`]
+    const focus = node && node.focus
+    if (typeof focus === 'function') {
+      setTimeout(() => focus(), 0)
+    }
+  }
+
+  function moveToNextPurchaseEntry(index: number, field: string, nextRowIndex: number) {
+    const order = ['productId', 'qty', 'price', 'amount', 'remark']
+    const nextFieldIndex = order.indexOf(field) + 1
+    if (nextFieldIndex < order.length) {
+      focusPurchaseEntry(index, order[nextFieldIndex])
+      return
+    }
+    if (nextRowIndex < fieldsCountRef.current) {
+      focusPurchaseEntry(nextRowIndex, 'productId')
+    } else {
+      addPurchaseRowRef.current?.(nextRowIndex)
+    }
+  }
+
+  const fieldsCountRef = useRef(0)
+  const addPurchaseRowRef = useRef<((nextIndex: number) => void) | null>(null)
 
   const loadDepartments = useCallback(async () => {
     setLoading(true)
@@ -1345,7 +1377,13 @@ export default function Departments() {
             <span>操作</span>
           </div>
           <Form.List name="items">
-            {(fields, { add, remove }) => (
+            {(fields, { add, remove }) => {
+              fieldsCountRef.current = fields.length
+              addPurchaseRowRef.current = (nextIndex: number) => {
+                add({ productId: undefined, qty: 1, price: 0, amount: 0 })
+                setTimeout(() => focusPurchaseEntry(nextIndex, 'productId'), 0)
+              }
+              return (
               <>
                 {fields.map((field) => (
                   <div className="dept-entry-row dept-entry-purchase-row" key={field.key}>
@@ -1354,7 +1392,18 @@ export default function Departments() {
                       name={[field.name, 'productId']}
                       rules={[{ required: true, message: '请选择商品' }]}
                     >
-                      <Select showSearch optionFilterProp="label" placeholder="选择商品" options={productOptions} />
+                      <Select
+                        ref={setPurchaseEntryRef(`${field.name}-productId`)}
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="选择商品"
+                        options={productOptions}
+                        onChange={(value) => {
+                          if (value) {
+                            moveToNextPurchaseEntry(field.name, 'productId', field.name + 1)
+                          }
+                        }}
+                      />
                     </Form.Item>
                     <Form.Item
                       className="dept-entry-field"
@@ -1362,9 +1411,13 @@ export default function Departments() {
                       rules={[{ required: true, message: '数量' }]}
                     >
                       <InputNumber
+                        ref={setPurchaseEntryRef(`${field.name}-qty`)}
                         min={0}
                         placeholder="数量"
                         style={{ width: '100%' }}
+                        onPressEnter={() =>
+                          moveToNextPurchaseEntry(field.name, 'qty', field.name + 1)
+                        }
                         onBlur={() =>
                           syncPurchaseRow(
                             field.name,
@@ -1376,10 +1429,14 @@ export default function Departments() {
                     </Form.Item>
                     <Form.Item className="dept-entry-field" name={[field.name, 'price']}>
                       <InputNumber
+                        ref={setPurchaseEntryRef(`${field.name}-price`)}
                         min={0}
                         precision={2}
                         placeholder="单价"
                         style={{ width: '100%' }}
+                        onPressEnter={() =>
+                          moveToNextPurchaseEntry(field.name, 'price', field.name + 1)
+                        }
                         onBlur={() =>
                           syncPurchaseRow(
                             field.name,
@@ -1391,10 +1448,14 @@ export default function Departments() {
                     </Form.Item>
                     <Form.Item className="dept-entry-field" name={[field.name, 'amount']}>
                       <InputNumber
+                        ref={setPurchaseEntryRef(`${field.name}-amount`)}
                         min={0}
                         precision={2}
                         placeholder="总额"
                         style={{ width: '100%' }}
+                        onPressEnter={() =>
+                          moveToNextPurchaseEntry(field.name, 'amount', field.name + 1)
+                        }
                         onBlur={() =>
                           syncPurchaseRow(
                             field.name,
@@ -1405,7 +1466,13 @@ export default function Departments() {
                       />
                     </Form.Item>
                     <Form.Item className="dept-entry-field" name={[field.name, 'remark']}>
-                      <Input placeholder="备注" />
+                      <Input
+                        ref={setPurchaseEntryRef(`${field.name}-remark`)}
+                        placeholder="备注"
+                        onPressEnter={() =>
+                          moveToNextPurchaseEntry(field.name, 'remark', field.name + 1)
+                        }
+                      />
                     </Form.Item>
                     <div className="dept-entry-actions">
                       <Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
@@ -1416,7 +1483,8 @@ export default function Departments() {
                   添加商品
                 </Button>
               </>
-            )}
+              )
+            }}
           </Form.List>
           <Space style={{ marginTop: 20, justifyContent: 'flex-end', width: '100%' }}>
             <Button onClick={() => setPurchaseOpen(false)}>取消</Button>
