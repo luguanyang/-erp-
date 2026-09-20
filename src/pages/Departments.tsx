@@ -515,6 +515,55 @@ export default function Departments() {
     setPurchaseOpen(true)
   }
 
+  function purchaseDraftKey() {
+    return `purchase_draft_${purchaseType}`
+  }
+
+  function removePurchaseDraft() {
+    localStorage.removeItem(purchaseDraftKey())
+  }
+
+  function savePurchaseDraft() {
+    try {
+      const values = purchaseForm.getFieldsValue()
+      const draft = Object.assign({}, values, {
+        date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+      })
+      localStorage.setItem(purchaseDraftKey(), JSON.stringify(draft))
+      message.success('已暂存，可稍后继续录入')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '暂存失败')
+    }
+  }
+
+  function loadPurchaseDraft() {
+    try {
+      const raw = localStorage.getItem(purchaseDraftKey())
+      if (!raw) {
+        message.info('当前没有暂存数据')
+        return
+      }
+      const draft = JSON.parse(raw)
+      purchaseForm.setFieldsValue(
+        Object.assign({}, draft, {
+          date: draft.date ? dayjs(draft.date) : dayjs(),
+        }),
+      )
+      message.success('已读取暂存数据')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '读取暂存失败')
+    }
+  }
+
+  function clearPurchaseDraft() {
+    try {
+      removePurchaseDraft()
+      message.success('暂存已清空')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '清空暂存失败')
+    }
+  }
+
   function syncPurchaseRow(
     index: number,
     changed: 'qty' | 'price' | 'amount',
@@ -567,6 +616,7 @@ export default function Departments() {
       })
       message.success(`采购流水已记录 ${res.handled} 条`)
       setPurchaseOpen(false)
+      removePurchaseDraft()
       await loadPurchaseLogs()
       await loadStock()
     } catch (err) {
@@ -1487,6 +1537,9 @@ export default function Departments() {
             }}
           </Form.List>
           <Space style={{ marginTop: 20, justifyContent: 'flex-end', width: '100%' }}>
+            <Button onClick={savePurchaseDraft}>暂存</Button>
+            <Button onClick={loadPurchaseDraft}>读取暂存</Button>
+            <Button danger onClick={clearPurchaseDraft}>清空暂存</Button>
             <Button onClick={() => setPurchaseOpen(false)}>取消</Button>
             <Button type="primary" htmlType="submit" loading={saving}>保存</Button>
           </Space>
