@@ -35,6 +35,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs'
 import * as XLSX from 'xlsx'
 import { api } from '../api'
+import { useAuth } from '../auth/AuthContext'
 import PageHeader from '../components/PageHeader'
 import PurchaseVoucherPrint, {
   type PurchaseVoucherGroup,
@@ -87,6 +88,7 @@ const logTypeLabels: Record<string, string> = {
 }
 
 export default function Departments() {
+  const { user: currentUser } = useAuth()
   const [deptForm] = Form.useForm<DepartmentForm>()
   const [purchaseForm] = Form.useForm<EntryForm>()
   const [moveForm] = Form.useForm<EntryForm>()
@@ -618,6 +620,67 @@ export default function Departments() {
     } catch (err) {
       message.error(err instanceof Error ? err.message : '清空暂存失败')
     }
+  }
+
+  function printCurrentPurchaseDraft() {
+    const values = purchaseForm.getFieldsValue()
+    const date = values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')
+    const targetType = values.targetType || 'warehouse'
+    const targetName =
+      targetType === 'department'
+        ? departments.find((d) => d.id === values.targetId)?.name || '默认部门'
+        : warehouses.find((w) => w.id === values.targetId)?.name || '默认仓库'
+
+    const logs: DepartmentLogItem[] = (values.items || [])
+      .filter((item: EntryItem) => item.productId)
+      .map((item: EntryItem, index: number) => {
+        const product = products.find((p) => p.id === item.productId)
+        const qty = Number(item.qty || 0)
+        const price = Number(item.price || 0)
+        const amount = Number(item.amount || 0)
+        return {
+          id: `current_purchase_${Date.now()}_${index}`,
+          logType: purchaseType === 'return' ? 'purchase_return' : purchaseType,
+          direction: purchaseType === 'return' ? 'out' : 'in',
+          supplier: values.supplier || '',
+          targetName,
+          productId: item.productId || '',
+          productName: product ? product.name : '未选择商品',
+          unit: product ? product.unit || '件' : '件',
+          qty,
+          counted: null,
+          diff: null,
+          price,
+          amount,
+          date,
+          fromType: '',
+          fromId: '',
+          fromName: '',
+          toType: '',
+          toId: '',
+          toName: '',
+          operator: currentUser?.name || '',
+          remark: item.remark || '',
+          recalled: false,
+          recalledAt: null,
+          createdAt: new Date(),
+        }
+      })
+
+    if (!logs.length) {
+      message.warning('请先选择至少一个商品')
+      return
+    }
+
+    setPurchaseVoucherGroups([
+      {
+        warehouseName: targetName,
+        date,
+        logs,
+      },
+    ])
+    setPurchaseVoucherOpen(true)
+    setTimeout(() => window.print(), 100)
   }
 
   function syncPurchaseRow(
@@ -1625,6 +1688,7 @@ export default function Departments() {
             <Button onClick={savePurchaseDraft}>暂存</Button>
             <Button onClick={loadPurchaseDraft}>读取暂存</Button>
             <Button danger onClick={clearPurchaseDraft}>清空暂存</Button>
+            <Button icon={<PrinterOutlined />} onClick={printCurrentPurchaseDraft}>直接打印</Button>
             <Button onClick={() => setPurchaseOpen(false)}>取消</Button>
             <Button type="primary" htmlType="submit" loading={saving}>保存</Button>
           </Space>
