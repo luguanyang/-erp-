@@ -676,6 +676,7 @@ export default function Departments() {
       {
         warehouseName: targetName,
         date,
+        logType: purchaseType === 'return' ? 'purchase_return' : purchaseType,
         logs,
       },
     ])
@@ -790,6 +791,7 @@ export default function Departments() {
         warehouseName:
           record.targetName || record.fromName || record.toName || '默认',
         date: record.date || dayjs(record.createdAt).format('YYYY-MM-DD'),
+        logType: record.logType || 'daily',
         logs: [record],
       },
     ])
@@ -810,9 +812,14 @@ export default function Departments() {
         const date = log.date || dayjs(log.createdAt).format('YYYY-MM-DD')
         const warehouseName =
           log.targetName || log.fromName || log.toName || '默认'
-        const key = `${warehouseName}__${date}`
+        const key = `${warehouseName}__${date}__${log.logType || 'daily'}`
         if (!groupMap.has(key)) {
-          groupMap.set(key, { warehouseName, date, logs: [] })
+          groupMap.set(key, {
+            warehouseName,
+            date,
+            logType: log.logType || 'daily',
+            logs: [],
+          })
         }
         groupMap.get(key)?.logs.push(log)
       })

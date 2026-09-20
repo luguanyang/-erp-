@@ -7,6 +7,7 @@ import type { DepartmentLogItem } from '../types'
 export interface PurchaseVoucherGroup {
   warehouseName: string
   date: string
+  logType: string
   logs: DepartmentLogItem[]
 }
 
@@ -17,12 +18,18 @@ interface PurchaseVoucherPrintProps {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  daily: '日常采购',
-  direct: '直拨进货',
-  purchase_return: '采购退货',
+  daily: '日常采购单',
+  direct: '直拨单',
+  purchase_return: '采购退货单',
 }
 
 const ITEMS_PER_PAGE = 5
+
+function voucherNo(group: PurchaseVoucherGroup, pageIndex: number) {
+  const prefix =
+    group.logType === 'direct' ? 'ZB' : group.logType === 'daily' ? 'CG' : 'TH'
+  return `${prefix}-${group.date}-${String(pageIndex + 1).padStart(4, '0')}`
+}
 
 function chunk<T>(items: T[], size: number) {
   const result: T[][] = []
@@ -89,31 +96,29 @@ export default function PurchaseVoucherPrint({
               className="stock-voucher-page"
               key={`${page.warehouseName}-${page.date}-${pageIndex}-${page.pageIndex}`}
             >
-              <h2 className="stock-voucher-title">采购流水凭证</h2>
-              <div className="stock-voucher-subtitle">
-                {totalLogs > 1 ? '（汇总）' : '（单条）'}
+              <div className="stock-voucher-title-row">
+                <h2 className="stock-voucher-title">
+                  {TYPE_LABELS[page.logType] || '采购单'}
+                </h2>
+                <span className="stock-voucher-no">
+                  No: {voucherNo(page, page.pageIndex)}
+                  {page.pageCount > 1 ? `  ${page.pageIndex + 1}/${page.pageCount}` : ''}
+                </span>
               </div>
               <div className="stock-voucher-meta">
-                <span>仓库/部门：{page.warehouseName || '默认'}</span>
-                <span>日期：{page.date}</span>
-                <span>打印时间：{dayjs().format('YYYY-MM-DD HH:mm')}</span>
-                {page.pageCount > 1 ? (
-                  <span>
-                    第 {page.pageIndex + 1} / {page.pageCount} 张
-                  </span>
-                ) : null}
+                <span>供应商：{page.logs[0]?.supplier || '-'}</span>
+                <span>收货部门：{page.warehouseName || '默认'}</span>
+                <span>制表日期：{page.date}</span>
               </div>
               <table className="stock-voucher-table">
                 <thead>
                   <tr>
                     <th className="stock-voucher-col-index">序号</th>
-                    <th>类型</th>
-                    <th>商品</th>
+                    <th>商品名称 / 规格</th>
+                    <th className="stock-voucher-col-unit">单位</th>
                     <th className="stock-voucher-col-qty">数量</th>
                     <th className="stock-voucher-col-price">单价（元）</th>
                     <th className="stock-voucher-col-amount">金额（元）</th>
-                    <th>供货商</th>
-                    <th>操作人</th>
                     <th>备注</th>
                   </tr>
                 </thead>
@@ -121,11 +126,8 @@ export default function PurchaseVoucherPrint({
                   {page.logs.map((log, index) => (
                     <tr key={log.id || `${page.date}-${index}`}>
                       <td className="stock-voucher-center">{index + 1}</td>
-                      <td>{TYPE_LABELS[log.logType] || log.logType}</td>
-                      <td>
-                        {log.productName}
-                        {log.unit ? `（${log.unit}）` : ''}
-                      </td>
+                      <td>{log.productName}</td>
+                      <td className="stock-voucher-center">{log.unit || '件'}</td>
                       <td className="stock-voucher-center">
                         {Number(log.qty || 0)}
                       </td>
@@ -135,8 +137,6 @@ export default function PurchaseVoucherPrint({
                       <td className="stock-voucher-right">
                         {Number(log.amount || 0).toFixed(2)}
                       </td>
-                      <td>{log.supplier || '-'}</td>
-                      <td>{log.operator || '-'}</td>
                       <td>{log.remark || '-'}</td>
                     </tr>
                   ))}
@@ -151,22 +151,17 @@ export default function PurchaseVoucherPrint({
                     <td className="stock-voucher-right">
                       {totalAmount.toFixed(2)}
                     </td>
-                    <td colSpan={3} />
+                    <td />
                   </tr>
                 </tfoot>
               </table>
-              <div className="stock-voucher-note">
-                本页 {page.logs.length} 条采购记录
-                {page.logs.length === 1 && page.logs[0].id
-                  ? `，流水号：${page.logs[0].id}`
-                  : ''}
-              </div>
               <div className="stock-voucher-sign">
-                <span>经办人签字：______________</span>
-                <span>审核人签字：______________</span>
+                <span>供应商：______________</span>
+                <span>部门主管：______________</span>
               </div>
               <div className="stock-voucher-sign stock-voucher-sign-second">
-                仓库/部门负责人签字：______________
+                <span>验货人：______________</span>
+                <span>制单人：{page.logs[0]?.operator || '______________'}</span>
               </div>
             </div>
           )

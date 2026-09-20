@@ -628,6 +628,19 @@ body {
   letter-spacing: 1.5mm;
 }
 
+.stock-voucher-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 2mm;
+}
+
+.stock-voucher-no {
+  font-size: 9pt;
+  color: #333333;
+  white-space: nowrap;
+}
+
 .stock-voucher-subtitle {
   margin-bottom: 2mm;
   text-align: center;
