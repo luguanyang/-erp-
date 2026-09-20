@@ -121,6 +121,7 @@ export default function Departments() {
   const [purchasePage, setPurchasePage] = useState(1)
   const [purchasePageSize, setPurchasePageSize] = useState(20)
   const [purchaseTotal, setPurchaseTotal] = useState(0)
+  const [purchaseDate, setPurchaseDate] = useState<Dayjs | null>(null)
   const [purchaseVoucherOpen, setPurchaseVoucherOpen] = useState(false)
   const [purchaseVoucherGroups, setPurchaseVoucherGroups] = useState<PurchaseVoucherGroup[]>([])
   const [purchaseSelectedKeys, setPurchaseSelectedKeys] = useState<Key[]>([])
@@ -300,10 +301,13 @@ export default function Departments() {
   const loadPurchaseLogs = useCallback(async () => {
     setPurchaseLoading(true)
     try {
+      const date = purchaseDate ? purchaseDate.format('YYYY-MM-DD') : ''
       const res = await api.departmentLogs({
         page: purchasePage,
         pageSize: purchasePageSize,
         types: ['daily', 'direct', 'purchase_return'],
+        startDate: date || undefined,
+        endDate: date || undefined,
       })
       setPurchaseLogs(res.list)
       setPurchaseTotal(res.total)
@@ -312,7 +316,7 @@ export default function Departments() {
     } finally {
       setPurchaseLoading(false)
     }
-  }, [purchasePage, purchasePageSize])
+  }, [purchasePage, purchasePageSize, purchaseDate])
 
   const loadMoveLogs = useCallback(async () => {
     setMoveLoading(true)
@@ -1012,6 +1016,26 @@ export default function Departments() {
                       采购退货
                     </Button>
                   </Space>
+                </div>
+                <div className="filter-bar">
+                  <DatePicker
+                    allowClear
+                    placeholder="选择日期"
+                    value={purchaseDate}
+                    onChange={(date) => {
+                      setPurchaseDate(date)
+                      setPurchasePage(1)
+                    }}
+                  />
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setPurchasePage(1)
+                      loadPurchaseLogs()
+                    }}
+                  >
+                    查询
+                  </Button>
                 </div>
                 <Spin spinning={purchaseLoading}>
                   <Table<DepartmentLogItem>
