@@ -8,6 +8,9 @@ export interface PurchaseVoucherGroup {
   warehouseName: string
   date: string
   logType: string
+  creator?: string
+  inspector?: string
+  departmentManager?: string
   logs: DepartmentLogItem[]
 }
 
@@ -157,11 +160,11 @@ export default function PurchaseVoucherPrint({
               </table>
               <div className="stock-voucher-sign">
                 <span>供应商：______________</span>
-                <span>部门主管：______________</span>
+                <span>部门主管：{page.departmentManager || '______________'}</span>
               </div>
               <div className="stock-voucher-sign stock-voucher-sign-second">
-                <span>验货人：______________</span>
-                <span>制单人：{page.logs[0]?.operator || '______________'}</span>
+                <span>验货人：{page.inspector || '______________'}</span>
+                <span>制单人：{page.creator || page.logs[0]?.operator || '______________'}</span>
               </div>
             </div>
           )

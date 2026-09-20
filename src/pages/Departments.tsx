@@ -67,6 +67,9 @@ interface EntryItem {
 interface EntryForm {
   date: Dayjs
   supplier?: string
+  creator?: string
+  inspector?: string
+  departmentManager?: string
   targetType?: 'warehouse' | 'department'
   targetId?: string
   sourceDepartmentId?: string
@@ -566,6 +569,9 @@ export default function Departments() {
     purchaseForm.setFieldsValue({
       date: dayjs(),
       supplier: '',
+      creator: currentUser?.name || '',
+      inspector: '',
+      departmentManager: '',
       targetType: 'warehouse',
       targetId: undefined,
       items: [{ productId: undefined, qty: 1, price: 0, amount: 0 }],
@@ -677,6 +683,9 @@ export default function Departments() {
         warehouseName: targetName,
         date,
         logType: purchaseType === 'return' ? 'purchase_return' : purchaseType,
+        creator: values.creator || currentUser?.name || '',
+        inspector: values.inspector || '',
+        departmentManager: values.departmentManager || '',
         logs,
       },
     ])
@@ -792,6 +801,9 @@ export default function Departments() {
           record.targetName || record.fromName || record.toName || '默认',
         date: record.date || dayjs(record.createdAt).format('YYYY-MM-DD'),
         logType: record.logType || 'daily',
+        creator: record.operator || '',
+        inspector: '',
+        departmentManager: '',
         logs: [record],
       },
     ])
@@ -818,6 +830,9 @@ export default function Departments() {
             warehouseName,
             date,
             logType: log.logType || 'daily',
+            creator: log.operator || '',
+            inspector: '',
+            departmentManager: '',
             logs: [],
           })
         }
@@ -1549,6 +1564,15 @@ export default function Departments() {
             </Form.Item>
             <Form.Item name="supplier" label="供货商">
               <Input placeholder="选填，例如：XX 供应商" style={{ width: 180 }} />
+            </Form.Item>
+            <Form.Item name="creator" label="制单人">
+              <Input placeholder="制单人" style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="inspector" label="验货人">
+              <Input placeholder="验货人" style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="departmentManager" label="部门主管">
+              <Input placeholder="部门主管" style={{ width: 140 }} />
             </Form.Item>
             <Form.Item name="targetType" label={purchaseType === 'return' ? '退货来源' : '入库去向'} rules={[{ required: true }]}>
               <Select
