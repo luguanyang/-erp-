@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
+  DatePicker,
+  Drawer,
   Form,
   Input,
   InputNumber,
@@ -13,14 +15,26 @@ import {
   Tag,
   message,
 } from 'antd'
-import { AuditOutlined, ExperimentOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
+import {
+  AuditOutlined,
+  DeleteOutlined,
+  ExperimentOutlined,
+  HistoryOutlined,
+  PlusOutlined,
+  PrinterOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
+import dayjs, { Dayjs } from 'dayjs'
 import { api } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import PageHeader from '../components/PageHeader'
+import StockVoucherPrint from '../components/StockVoucherPrint'
 import type {
   CategoryItem,
   InventoryItem,
+  ProductItem,
   StockLogItem,
+  StockVoucherGroup,
   WarehouseItem,
 } from '../types'
 
@@ -51,6 +65,25 @@ interface CountForm {
   remark: string
 }
 
+interface BatchInboundItem {
+  productId?: string
+  qty?: number
+  price?: number
+  amount?: number
+  remark?: string
+}
+
+interface BatchInboundForm {
+  date: Dayjs
+  warehouseId?: string
+  inboundBy?: string
+  operatorName?: string
+  creator?: string
+  inspector?: string
+  departmentManager?: string
+  items: BatchInboundItem[]
+}
+
 export default function Inventory() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
@@ -59,6 +92,7 @@ export default function Inventory() {
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([])
   const [warehouseStocks, setWarehouseStocks] = useState<Record<string, number>>({})
   const [warehouseLoading, setWarehouseLoading] = useState(false)
+  const [products, setProducts] = useState<ProductItem[]>([])
   const [detailLogs, setDetailLogs] = useState<StockLogItem[]>([])
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailProduct, setDetailProduct] = useState<{ id: string; name: string } | null>(null)
@@ -75,6 +109,11 @@ export default function Inventory() {
   const [editing, setEditing] = useState<InventoryItem | null>(null)
   const [moving, setMoving] = useState<{ record: InventoryItem; type: 'in' | 'out' } | null>(null)
   const [moveForm] = Form.useForm<StockMoveForm>()
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [batchForm] = Form.useForm<BatchInboundForm>()
+  const [batchSaving, setBatchSaving] = useState(false)
+  const [stockVoucherOpen, setStockVoucherOpen] = useState(false)
+  const [stockVoucherGroups, setStockVoucherGroups] = useState<StockVoucherGroup[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -109,6 +148,13 @@ export default function Inventory() {
     api
       .warehouseList()
       .then((res) => setWarehouses(res.list))
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    api
+      .productList({ page: 1, pageSize: 200 })
+      .then((res) => setProducts(res.list))
       .catch(() => undefined)
   }, [])
 
@@ -301,10 +347,200 @@ export default function Inventory() {
     }
   }
 
+  function openBatchInbound() {
+    batchForm.resetFields()
+    batchForm.setFieldsValue({
+      date: dayjs(),
+      warehouseId: warehouses[0]?.id || '',
+      inboundBy: '',
+      operatorName: currentUser?.name || '',
+      creator: currentUser?.name || '',
+      inspector: '',
+      departmentManager: '',
+      items: [{ productId: undefined, qty: 1, price: 0, amount: 0, remark: '' }],
+    })
+    setBatchOpen(true)
+  }
+
+  function batchDraftKey() {
+    return 'inventory_batch_inbound_draft'
+  }
+
+  function removeBatchDraft() {
+    localStorage.removeItem(batchDraftKey())
+  }
+
+  function saveBatchDraft() {
+    try {
+      const values = batchForm.getFieldsValue()
+      const draft = Object.assign({}, values, {
+        date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+      })
+      localStorage.setItem(batchDraftKey(), JSON.stringify(draft))
+      message.success('已暂存入库单')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '暂存失败')
+    }
+  }
+
+  function loadBatchDraft() {
+    try {
+      const raw = localStorage.getItem(batchDraftKey())
+      if (!raw) {
+        message.info('当前没有暂存的入库单')
+        return
+      }
+      const draft = JSON.parse(raw)
+      batchForm.setFieldsValue(
+        Object.assign({}, draft, {
+          date: draft.date ? dayjs(draft.date) : dayjs(),
+        }),
+      )
+      message.success('已读取暂存入库单')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '读取暂存失败')
+    }
+  }
+
+  function clearBatchDraft() {
+    try {
+      removeBatchDraft()
+      message.success('暂存已清空')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '清空暂存失败')
+    }
+  }
+
+  function syncBatchRow(
+    index: number,
+    changed: 'qty' | 'price' | 'amount',
+    value: number | null,
+  ) {
+    const items = batchForm.getFieldValue('items') || []
+    const row = items[index] || {}
+    const qty = changed === 'qty' ? Number(value || 0) : Number(row.qty || 0)
+    const price = changed === 'price' ? Number(value || 0) : Number(row.price || 0)
+    const amount = changed === 'amount' ? Number(value || 0) : Number(row.amount || 0)
+
+    if (changed === 'amount' && qty > 0 && amount > 0) {
+      const nextPrice = Math.round((amount / qty) * 100) / 100
+      if (nextPrice !== Number(row.price || 0)) {
+        batchForm.setFieldValue(['items', index, 'price'], nextPrice)
+      }
+      return
+    }
+
+    if (changed === 'qty' && qty > 0) {
+      if (amount > 0) {
+        const nextPrice = Math.round((amount / qty) * 100) / 100
+        batchForm.setFieldValue(['items', index, 'price'], nextPrice)
+      } else if (price > 0) {
+        const nextAmount = Math.round(qty * price * 100) / 100
+        batchForm.setFieldValue(['items', index, 'amount'], nextAmount)
+      }
+      return
+    }
+
+    if (changed === 'price' && qty > 0 && price >= 0) {
+      const nextAmount = Math.round(qty * price * 100) / 100
+      batchForm.setFieldValue(['items', index, 'amount'], nextAmount)
+    }
+  }
+
+  function printBatchInbound() {
+    const values = batchForm.getFieldsValue()
+    const warehouseName =
+      warehouses.find((w) => w.id === values.warehouseId)?.name || '默认仓库'
+    const date = values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')
+    const logs = (values.items || [])
+      .filter((item: BatchInboundItem) => item.productId)
+      .map((item: BatchInboundItem, index: number) => {
+        const product = products.find((p) => p.id === item.productId)
+        return {
+          id: `batch_in_${Date.now()}_${index}`,
+          productName: product?.name || '未选择商品',
+          spec: product?.spec || '',
+          unit: product?.unit || '件',
+          qty: Number(item.qty || 0),
+          price: Number(item.price || 0),
+          warehouseName,
+          inboundBy: values.inboundBy || '',
+          operatorName: values.operatorName || '',
+          reason: item.remark || '',
+          createdAt: new Date(),
+        }
+      })
+
+    if (!logs.length) {
+      message.warning('请先选择至少一个商品')
+      return
+    }
+
+    setStockVoucherGroups([
+      {
+        warehouseName,
+        date,
+        logs,
+      },
+    ])
+    setStockVoucherOpen(true)
+    setTimeout(() => window.print(), 100)
+  }
+
+  async function handleBatchInbound(values: BatchInboundForm) {
+    const validItems = (values.items || []).filter(
+      (item) => item.productId && Number(item.qty || 0) > 0,
+    )
+    if (!values.warehouseId) {
+      message.warning('请选择入库仓库')
+      return
+    }
+    if (!validItems.length) {
+      message.warning('请至少录入一个有效商品')
+      return
+    }
+
+    setBatchSaving(true)
+    try {
+      for (let index = 0; index < validItems.length; index += 1) {
+        const item = validItems[index]
+        try {
+          await api.stockMove({
+            productId: item.productId,
+            type: 'in',
+            qty: Number(item.qty || 0),
+            price: Number(item.price || 0),
+            warehouseId: values.warehouseId,
+            inboundBy: values.inboundBy,
+            operatorName: values.operatorName,
+            reason: item.remark || '',
+          })
+        } catch (err) {
+          message.error(
+            `第 ${index + 1} 条入库失败：${
+              err instanceof Error ? err.message : '请检查商品和数量'
+            }`,
+          )
+          return
+        }
+      }
+      message.success(`批量入库成功，共 ${validItems.length} 条`)
+      setBatchOpen(false)
+      removeBatchDraft()
+      await load()
+    } finally {
+      setBatchSaving(false)
+    }
+  }
+
   const currentProcessed = Form.useWatch('processed', processForm)
   const currentLoss = Math.max(0, (processing?.stock || 0) - Number(currentProcessed || 0))
   const currentCounted = Form.useWatch('counted', countForm)
   const countDiff = Number(currentCounted || 0) - (counting?.stock || 0)
+  const productOptions = products.map((p) => ({
+    value: p.id,
+    label: `${p.name}${p.spec ? `（${p.spec}）` : ''}`,
+  }))
 
   async function handleMove(values: StockMoveForm) {
     if (!moving) return
@@ -374,6 +610,9 @@ export default function Inventory() {
           ).map((s) => ({ value: s, label: s }))}
           onChange={(value) => setFilters((f) => ({ ...f, subcategory: value || '' }))}
         />
+        <Button type="primary" icon={<PlusOutlined />} onClick={openBatchInbound}>
+          入库
+        </Button>
         <Button icon={<HistoryOutlined />} onClick={() => navigate('/inventory/logs')}>
           出入库记录
         </Button>
@@ -739,6 +978,169 @@ export default function Inventory() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title="批量入库"
+        width={920}
+        open={batchOpen}
+        onClose={() => setBatchOpen(false)}
+      >
+        <Form<BatchInboundForm>
+          form={batchForm}
+          layout="vertical"
+          onFinish={handleBatchInbound}
+        >
+          <Space size={12} style={{ display: 'flex', flexWrap: 'wrap' }}>
+            <Form.Item name="date" label="入库日期" rules={[{ required: true }]}>
+              <DatePicker style={{ width: 150 }} />
+            </Form.Item>
+            <Form.Item
+              name="warehouseId"
+              label="入库仓库"
+              rules={[{ required: true, message: '请选择仓库' }]}
+            >
+              <Select
+                style={{ width: 180 }}
+                options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+              />
+            </Form.Item>
+            <Form.Item name="inboundBy" label="入库申报人">
+              <Input placeholder="入库申报人" style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="operatorName" label="操作员">
+              <Input placeholder="操作员" style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="creator" label="制单人">
+              <Input placeholder="制单人" style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="inspector" label="验货人">
+              <Input placeholder="验货人" style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="departmentManager" label="部门主管">
+              <Input placeholder="部门主管" style={{ width: 140 }} />
+            </Form.Item>
+          </Space>
+
+          <div className="dept-entry-head dept-entry-purchase-head">
+            <span>商品</span>
+            <span>数量</span>
+            <span>单价</span>
+            <span>总额</span>
+            <span>备注</span>
+            <span>操作</span>
+          </div>
+          <Form.List name="items">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((field) => (
+                  <div className="dept-entry-row dept-entry-purchase-row" key={field.key}>
+                    <Form.Item
+                      className="dept-entry-field"
+                      name={[field.name, 'productId']}
+                      rules={[{ required: true, message: '请选择商品' }]}
+                    >
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="选择商品"
+                        options={productOptions}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      className="dept-entry-field"
+                      name={[field.name, 'qty']}
+                      rules={[{ required: true, message: '数量' }]}
+                    >
+                      <InputNumber
+                        min={1}
+                        placeholder="数量"
+                        style={{ width: '100%' }}
+                        onBlur={() =>
+                          syncBatchRow(
+                            field.name,
+                            'qty',
+                            batchForm.getFieldValue(['items', field.name, 'qty']),
+                          )
+                        }
+                      />
+                    </Form.Item>
+                    <Form.Item className="dept-entry-field" name={[field.name, 'price']}>
+                      <InputNumber
+                        min={0}
+                        precision={2}
+                        placeholder="单价"
+                        style={{ width: '100%' }}
+                        onBlur={() =>
+                          syncBatchRow(
+                            field.name,
+                            'price',
+                            batchForm.getFieldValue(['items', field.name, 'price']),
+                          )
+                        }
+                      />
+                    </Form.Item>
+                    <Form.Item className="dept-entry-field" name={[field.name, 'amount']}>
+                      <InputNumber
+                        min={0}
+                        precision={2}
+                        placeholder="总额"
+                        style={{ width: '100%' }}
+                        onBlur={() =>
+                          syncBatchRow(
+                            field.name,
+                            'amount',
+                            batchForm.getFieldValue(['items', field.name, 'amount']),
+                          )
+                        }
+                      />
+                    </Form.Item>
+                    <Form.Item className="dept-entry-field" name={[field.name, 'remark']}>
+                      <Input placeholder="备注" />
+                    </Form.Item>
+                    <div className="dept-entry-actions">
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => remove(field.name)}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="dashed"
+                  block
+                  icon={<PlusOutlined />}
+                  onClick={() =>
+                    add({ productId: undefined, qty: 1, price: 0, amount: 0, remark: '' })
+                  }
+                >
+                  添加商品
+                </Button>
+              </>
+            )}
+          </Form.List>
+
+          <Space style={{ marginTop: 20, justifyContent: 'flex-end', width: '100%' }}>
+            <Button onClick={saveBatchDraft}>暂存</Button>
+            <Button onClick={loadBatchDraft}>读取暂存</Button>
+            <Button danger onClick={clearBatchDraft}>清空暂存</Button>
+            <Button icon={<PrinterOutlined />} onClick={printBatchInbound}>
+              直接打印
+            </Button>
+            <Button onClick={() => setBatchOpen(false)}>取消</Button>
+            <Button type="primary" htmlType="submit" loading={batchSaving}>
+              保存
+            </Button>
+          </Space>
+        </Form>
+      </Drawer>
+
+      <StockVoucherPrint
+        open={stockVoucherOpen}
+        groups={stockVoucherGroups}
+        onClose={() => setStockVoucherOpen(false)}
+      />
     </>
   )
 }
