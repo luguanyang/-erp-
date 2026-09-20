@@ -126,6 +126,11 @@ export default function Departments() {
   const [purchaseVoucherGroups, setPurchaseVoucherGroups] = useState<PurchaseVoucherGroup[]>([])
   const [purchaseSelectedKeys, setPurchaseSelectedKeys] = useState<Key[]>([])
   const [purchaseSelectedLogs, setPurchaseSelectedLogs] = useState<DepartmentLogItem[]>([])
+  const [flowOpen, setFlowOpen] = useState(false)
+  const [flowProductId, setFlowProductId] = useState('')
+  const [flowRange, setFlowRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
+  const [flowLoading, setFlowLoading] = useState(false)
+  const [flowRows, setFlowRows] = useState<DepartmentLogItem[]>([])
 
   const [moveLogs, setMoveLogs] = useState<DepartmentLogItem[]>([])
   const [moveLoading, setMoveLoading] = useState(false)
@@ -441,6 +446,53 @@ export default function Departments() {
     if (!productId) return '-'
     const row = countStockMap[productId]
     return row ? `${Number(row.stock || 0)} ${row.unit || ''}`.trim() : '-'
+  }
+
+  function openProductFlow() {
+    setFlowRows([])
+    setFlowProductId('')
+    setFlowRange(null)
+    setFlowOpen(true)
+  }
+
+  async function queryProductFlow() {
+    const start = flowRange && flowRange[0] ? flowRange[0].format('YYYY-MM-DD') : ''
+    const end = flowRange && flowRange[1] ? flowRange[1].format('YYYY-MM-DD') : ''
+    if (!flowProductId || !start || !end) {
+      message.warning('请选择商品和时间段')
+      return
+    }
+    if (start > end) {
+      message.warning('开始日期不能晚于结束日期')
+      return
+    }
+
+    setFlowLoading(true)
+    try {
+      const all: DepartmentLogItem[] = []
+      let page = 1
+      while (true) {
+        const res = await api.departmentLogs({
+          page,
+          pageSize: 200,
+          productId: flowProductId,
+          startDate: start,
+          endDate: end,
+          types: ['daily', 'direct', 'purchase_return', 'issue', 'return', 'transfer', 'sale'],
+        })
+        all.push(...res.list)
+        if (!res.list.length || all.length >= res.total) break
+        page += 1
+      }
+      setFlowRows(all)
+      if (!all.length) {
+        message.info('该时间段内没有这个商品的进出货记录')
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '进出货查询失败')
+    } finally {
+      setFlowLoading(false)
+    }
   }
 
   async function handleDeptFinish(values: DepartmentForm) {
@@ -793,6 +845,12 @@ export default function Departments() {
   const validPurchaseSelectedCount = purchaseSelectedLogs.filter(
     (record) => !record.recalled,
   ).length
+  const flowInQty = flowRows
+    .filter((row) => row.direction === 'in')
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0)
+  const flowOutQty = flowRows
+    .filter((row) => row.direction === 'out')
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0)
 
   return (
     <>
@@ -1014,6 +1072,9 @@ export default function Departments() {
                     </Button>
                     <Button icon={<RollbackOutlined />} onClick={() => openPurchase('return')}>
                       采购退货
+                    </Button>
+                    <Button icon={<SearchOutlined />} onClick={openProductFlow}>
+                      进出货查询
                     </Button>
                   </Space>
                 </div>
@@ -1633,6 +1694,88 @@ export default function Departments() {
           </Space>
         </Form>
       </Drawer>
+
+      <Modal
+        title="商品进出货查询"
+        open={flowOpen}
+        width={900}
+        onCancel={() => setFlowOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <div className="filter-bar">
+          <Select
+            showSearch
+            allowClear
+            optionFilterProp="label"
+            placeholder="选择商品"
+            style={{ width: 300 }}
+            value={flowProductId || undefined}
+            options={productOptions}
+            onChange={(value) => setFlowProductId(value || '')}
+          />
+          <DatePicker.RangePicker
+            value={flowRange}
+            onChange={(dates) =>
+              setFlowRange(
+                dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null,
+              )
+            }
+          />
+          <Button type="primary" loading={flowLoading} onClick={queryProductFlow}>
+            查询
+          </Button>
+        </div>
+
+        {flowRows.length ? (
+          <div className="flow-summary">
+            <span>期间进货量：{flowInQty}</span>
+            <span>期间出货量：{flowOutQty}</span>
+            <span>净变化：{flowInQty - flowOutQty}</span>
+          </div>
+        ) : null}
+
+        <Spin spinning={flowLoading}>
+          <Table<DepartmentLogItem>
+            rowKey="id"
+            dataSource={flowRows}
+            size="small"
+            pagination={false}
+            columns={[
+              { title: '日期', dataIndex: 'date', width: 110 },
+              {
+                title: '类型',
+                dataIndex: 'logType',
+                width: 110,
+                render: (type: string) => logTypeLabels[type] || type,
+              },
+              { title: '商品', dataIndex: 'productName' },
+              {
+                title: '方向',
+                dataIndex: 'direction',
+                width: 90,
+                render: (value: string) =>
+                  value === 'in' ? '入库' : value === 'out' ? '出库' : value,
+              },
+              { title: '数量', dataIndex: 'qty', width: 90 },
+              {
+                title: '来源',
+                dataIndex: 'fromName',
+                width: 130,
+                render: (value: string) => value || '-',
+              },
+              {
+                title: '去向',
+                dataIndex: 'toName',
+                width: 130,
+                render: (value: string) => value || '-',
+              },
+              { title: '操作人', dataIndex: 'operator', width: 110 },
+              { title: '备注', dataIndex: 'remark' },
+            ]}
+          />
+        </Spin>
+      </Modal>
 
       <PurchaseVoucherPrint
         open={purchaseVoucherOpen}
