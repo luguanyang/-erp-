@@ -144,19 +144,21 @@ export default function PurchaseVoucherPrint({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3} className="stock-voucher-total-label">
-                      合计
-                    </td>
-                    <td className="stock-voucher-center">{totalQty}</td>
-                    <td />
-                    <td className="stock-voucher-right">
-                      {totalAmount.toFixed(2)}
-                    </td>
-                    <td />
-                  </tr>
-                </tfoot>
+                {page.pageIndex === page.pageCount - 1 ? (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} className="stock-voucher-total-label">
+                        合计
+                      </td>
+                      <td className="stock-voucher-center">{totalQty}</td>
+                      <td />
+                      <td className="stock-voucher-right">
+                        {totalAmount.toFixed(2)}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                ) : null}
               </table>
               <div className="stock-voucher-sign">
                 <span>供应商：______________</span>
