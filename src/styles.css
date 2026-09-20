@@ -713,7 +713,7 @@ body {
 
 @media print {
   @page {
-    size: 210mm 93mm;
+    size: 210mm 93mm landscape;
     margin: 0;
   }
 
