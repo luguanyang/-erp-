@@ -134,6 +134,7 @@ export default function Departments() {
 
   const [purchaseLoading, setPurchaseLoading] = useState(false)
   const [purchaseRange, setPurchaseRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
+  const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('')
   const [purchaseSourceLogs, setPurchaseSourceLogs] = useState<DepartmentLogItem[]>([])
   const [purchaseSummaryRows, setPurchaseSummaryRows] = useState<PurchaseSummaryRow[]>([])
   const [purchaseVoucherOpen, setPurchaseVoucherOpen] = useState(false)
@@ -329,12 +330,18 @@ export default function Departments() {
           ? purchaseRange[1].format('YYYY-MM-DD')
           : ''
       const all: DepartmentLogItem[] = []
+      const types =
+        purchaseTypeFilter === 'return'
+          ? ['purchase_return']
+          : purchaseTypeFilter
+            ? [purchaseTypeFilter]
+            : ['daily', 'direct', 'purchase_return']
       let page = 1
       while (true) {
         const res = await api.departmentLogs({
           page,
           pageSize: 200,
-          types: ['daily', 'direct', 'purchase_return'],
+          types,
           startDate: start || undefined,
           endDate: end || undefined,
         })
@@ -349,7 +356,7 @@ export default function Departments() {
     } finally {
       setPurchaseLoading(false)
     }
-  }, [purchaseRange])
+  }, [purchaseRange, purchaseTypeFilter])
 
   const loadMoveLogs = useCallback(async () => {
     setMoveLoading(true)
@@ -1214,6 +1221,18 @@ export default function Departments() {
                   </Space>
                 </div>
                 <div className="filter-bar">
+                  <Select
+                    allowClear
+                    placeholder="全部类型"
+                    style={{ width: 140 }}
+                    value={purchaseTypeFilter || undefined}
+                    options={[
+                      { value: 'daily', label: '日常采购' },
+                      { value: 'direct', label: '直拨进货' },
+                      { value: 'return', label: '采购退货' },
+                    ]}
+                    onChange={(value) => setPurchaseTypeFilter(value || '')}
+                  />
                   <DatePicker.RangePicker
                     allowClear
                     placeholder={['开始日期', '结束日期']}
