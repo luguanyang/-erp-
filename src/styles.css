@@ -616,14 +616,14 @@ body {
 
 .stock-voucher-page {
   min-height: 93mm;
-  padding: 6mm 8mm;
+  padding: 4mm 6mm;
   box-sizing: border-box;
 }
 
 .stock-voucher-title {
-  margin: 0 0 2mm;
+  margin: 0 0 1.5mm;
   text-align: center;
-  font-size: 15pt;
+  font-size: 14pt;
   font-weight: 700;
   letter-spacing: 1.5mm;
 }
@@ -642,7 +642,7 @@ body {
 }
 
 .stock-voucher-subtitle {
-  margin-bottom: 2mm;
+  margin-bottom: 1.5mm;
   text-align: center;
   font-size: 9pt;
   color: #333333;
@@ -652,20 +652,20 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 2mm;
-  font-size: 9pt;
+  margin-bottom: 1.5mm;
+  font-size: 8.5pt;
 }
 
 .stock-voucher-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9pt;
+  font-size: 8.5pt;
 }
 
 .stock-voucher-table th,
 .stock-voucher-table td {
   border: 1px solid #333333;
-  padding: 1.5mm 1mm;
+  padding: 1mm 0.8mm;
   line-height: 1.25;
   vertical-align: middle;
 }
@@ -707,7 +707,7 @@ body {
 }
 
 .stock-voucher-note {
-  margin-top: 1.5mm;
+  margin-top: 1mm;
   font-size: 8.5pt;
   color: #333333;
 }
@@ -715,13 +715,13 @@ body {
 .stock-voucher-sign {
   display: flex;
   justify-content: space-between;
-  margin-top: 4mm;
-  font-size: 10pt;
+  margin-top: 3mm;
+  font-size: 9.5pt;
 }
 
 .stock-voucher-sign-second {
   justify-content: flex-start;
-  margin-top: 3mm;
+  margin-top: 2mm;
 }
 
 @media print {
