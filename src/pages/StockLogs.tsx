@@ -11,8 +11,9 @@ import {
   Tag,
   message,
 } from 'antd'
-import { PrinterOutlined, SearchOutlined } from '@ant-design/icons'
+import { DownloadOutlined, PrinterOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
+import * as XLSX from 'xlsx'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
 import StockVoucherPrint from '../components/StockVoucherPrint'
@@ -156,6 +157,36 @@ export default function StockLogs() {
     setVoucherOpen(true)
   }
 
+  function exportSelected() {
+    const rows = selectedLogs.filter(
+      (record) => record.type === 'in' && !record.recalled,
+    )
+    if (!rows.length) {
+      message.warning('请先勾选要导出的入库记录')
+      return
+    }
+    const sheet = XLSX.utils.json_to_sheet(
+      rows.map((row) => ({
+        商品: row.productName,
+        规格: row.spec,
+        分类: row.categoryName,
+        子分类: row.subcategory,
+        仓库: row.warehouseName,
+        数量: row.qty,
+        单位: row.unit,
+        价格: Number(row.price || 0).toFixed(2),
+        金额: (Number(row.price || 0) * Number(row.qty || 0)).toFixed(2),
+        入库申报人: row.inboundBy,
+        操作员: row.operatorName,
+        原因: row.reason,
+        时间: new Date(row.createdAt).toLocaleString('zh-CN'),
+      })),
+    )
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, sheet, '入库记录')
+    XLSX.writeFile(workbook, `入库记录_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`)
+  }
+
   async function runSummary() {
     if (!summaryRange || !summaryRange[0] || !summaryRange[1]) {
       message.warning('请先选择日期范围')
@@ -232,6 +263,13 @@ export default function StockLogs() {
               onClick={printSelected}
             >
               打印选中{validSelectedCount ? `（${validSelectedCount}）` : ''}
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              disabled={validSelectedCount === 0}
+              onClick={exportSelected}
+            >
+              导出选中
             </Button>
             <Button
               icon={<PrinterOutlined />}
