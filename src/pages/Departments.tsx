@@ -136,7 +136,9 @@ export default function Departments() {
   const [purchasePage, setPurchasePage] = useState(1)
   const [purchasePageSize, setPurchasePageSize] = useState(20)
   const [purchaseTotal, setPurchaseTotal] = useState(0)
-  const [purchaseRange, setPurchaseRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
+  const [purchaseRange, setPurchaseRange] = useState<[Dayjs | null, Dayjs | null] | null>(
+    () => [dayjs(), dayjs()],
+  )
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('')
   const [purchaseProductFilter, setPurchaseProductFilter] = useState('')
   const [purchaseSummaryRows, setPurchaseSummaryRows] = useState<PurchaseSummaryRow[]>([])
@@ -1338,7 +1340,9 @@ export default function Departments() {
                     value={purchaseRange}
                     onChange={(dates) => {
                       setPurchaseRange(
-                        dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null,
+                        dates && dates[0] && dates[1]
+                          ? [dates[0], dates[1]]
+                          : [dayjs(), dayjs()],
                       )
                     }}
                   />
