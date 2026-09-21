@@ -86,6 +86,9 @@ export default function PurchaseVoucherPrint({
       </div>
       <div className="stock-voucher-print">
         {pages.map((page, pageIndex) => {
+          const globalStart = pages
+            .slice(0, pageIndex)
+            .reduce((sum, item) => sum + item.logs.length, 0)
           const totalQty = page.logs.reduce(
             (sum, log) => sum + Number(log.qty || 0),
             0,
@@ -128,7 +131,7 @@ export default function PurchaseVoucherPrint({
                 <tbody>
                   {page.logs.map((log, index) => (
                     <tr key={log.id || `${page.date}-${index}`}>
-                      <td className="stock-voucher-center">{index + 1}</td>
+                      <td className="stock-voucher-center">{globalStart + index + 1}</td>
                       <td>{log.productName}</td>
                       <td className="stock-voucher-center">{log.unit || '件'}</td>
                       <td className="stock-voucher-center">
