@@ -79,6 +79,17 @@ interface EntryForm {
   items: EntryItem[]
 }
 
+interface PurchaseSummaryRow {
+  key: string
+  productId: string
+  productName: string
+  unit: string
+  count: number
+  totalQty: number
+  totalAmount: number
+  supplier: string
+}
+
 const logTypeLabels: Record<string, string> = {
   daily: '日常采购',
   direct: '直拨进货',
@@ -121,12 +132,10 @@ export default function Departments() {
     keyword: '',
   })
 
-  const [purchaseLogs, setPurchaseLogs] = useState<DepartmentLogItem[]>([])
   const [purchaseLoading, setPurchaseLoading] = useState(false)
-  const [purchasePage, setPurchasePage] = useState(1)
-  const [purchasePageSize, setPurchasePageSize] = useState(20)
-  const [purchaseTotal, setPurchaseTotal] = useState(0)
-  const [purchaseDate, setPurchaseDate] = useState<Dayjs | null>(null)
+  const [purchaseRange, setPurchaseRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
+  const [purchaseSourceLogs, setPurchaseSourceLogs] = useState<DepartmentLogItem[]>([])
+  const [purchaseSummaryRows, setPurchaseSummaryRows] = useState<PurchaseSummaryRow[]>([])
   const [purchaseVoucherOpen, setPurchaseVoucherOpen] = useState(false)
   const [purchaseVoucherGroups, setPurchaseVoucherGroups] = useState<PurchaseVoucherGroup[]>([])
   const [purchaseSelectedKeys, setPurchaseSelectedKeys] = useState<Key[]>([])
@@ -311,22 +320,36 @@ export default function Departments() {
   const loadPurchaseLogs = useCallback(async () => {
     setPurchaseLoading(true)
     try {
-      const date = purchaseDate ? purchaseDate.format('YYYY-MM-DD') : ''
-      const res = await api.departmentLogs({
-        page: purchasePage,
-        pageSize: purchasePageSize,
-        types: ['daily', 'direct', 'purchase_return'],
-        startDate: date || undefined,
-        endDate: date || undefined,
-      })
-      setPurchaseLogs(res.list)
-      setPurchaseTotal(res.total)
+      const start =
+        purchaseRange && purchaseRange[0]
+          ? purchaseRange[0].format('YYYY-MM-DD')
+          : ''
+      const end =
+        purchaseRange && purchaseRange[1]
+          ? purchaseRange[1].format('YYYY-MM-DD')
+          : ''
+      const all: DepartmentLogItem[] = []
+      let page = 1
+      while (true) {
+        const res = await api.departmentLogs({
+          page,
+          pageSize: 200,
+          types: ['daily', 'direct', 'purchase_return'],
+          startDate: start || undefined,
+          endDate: end || undefined,
+        })
+        all.push(...res.list)
+        if (!res.list.length || all.length >= res.total) break
+        page += 1
+      }
+      setPurchaseSourceLogs(all)
+      setPurchaseSummaryRows(buildPurchaseSummary(all))
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载采购流水失败')
     } finally {
       setPurchaseLoading(false)
     }
-  }, [purchasePage, purchasePageSize, purchaseDate])
+  }, [purchaseRange])
 
   const loadMoveLogs = useCallback(async () => {
     setMoveLoading(true)
@@ -373,6 +396,34 @@ export default function Departments() {
   useEffect(() => {
     if (activeTab === 'count') loadCountLogs()
   }, [activeTab, loadCountLogs])
+
+  function buildPurchaseSummary(logs: DepartmentLogItem[]): PurchaseSummaryRow[] {
+    const map = new Map<string, PurchaseSummaryRow>()
+    logs.forEach((log) => {
+      const key = `${log.productId}__${log.unit || ''}`
+      const current = map.get(key)
+      if (current) {
+        current.count += 1
+        current.totalQty += Number(log.qty || 0)
+        current.totalAmount += Number(log.amount || 0)
+        if (log.supplier) current.supplier = log.supplier
+      } else {
+        map.set(key, {
+          key,
+          productId: log.productId || '',
+          productName: log.productName || '未知商品',
+          unit: log.unit || '件',
+          count: 1,
+          totalQty: Number(log.qty || 0),
+          totalAmount: Number(log.amount || 0),
+          supplier: log.supplier || '',
+        })
+      }
+    })
+    return Array.from(map.values()).sort((a, b) =>
+      a.productName.localeCompare(b.productName, 'zh-CN'),
+    )
+  }
 
   async function fetchDepartmentStockRows(departmentId: string) {
     const all: DepartmentStockItem[] = []
@@ -841,18 +892,19 @@ export default function Departments() {
     return Array.from(groupMap.values())
   }
 
-  function handlePurchaseSelectionChange(
-    nextKeys: Key[],
-    nextRows: DepartmentLogItem[],
-  ) {
+  function handlePurchaseSelectionChange(nextKeys: Key[]) {
     const keySet = new Set(nextKeys.map(String))
+    const selectedProductIds = new Set(
+      purchaseSummaryRows
+        .filter((row) => keySet.has(row.key))
+        .map((row) => row.productId),
+    )
     setPurchaseSelectedKeys(nextKeys)
-    setPurchaseSelectedLogs((prev) => {
-      const merged = new Map<string, DepartmentLogItem>()
-      prev.forEach((row) => merged.set(row.id, row))
-      nextRows.forEach((row) => merged.set(row.id, row))
-      return Array.from(merged.values()).filter((row) => keySet.has(row.id))
-    })
+    setPurchaseSelectedLogs(
+      purchaseSourceLogs.filter(
+        (row) => !row.recalled && selectedProductIds.has(row.productId),
+      ),
+    )
   }
 
   function printSelectedPurchase() {
@@ -927,9 +979,7 @@ export default function Departments() {
 
   const currentCategory = categories.find((c) => c.key === stockFilters.category)
   const productOptions = products.map((p) => ({ value: p.id, label: `${p.name}${p.spec ? `(${p.spec})` : ''}` }))
-  const validPurchaseSelectedCount = purchaseSelectedLogs.filter(
-    (record) => !record.recalled,
-  ).length
+  const validPurchaseSelectedCount = purchaseSelectedKeys.length
   const flowInQty = flowRows
     .filter((row) => row.direction === 'in')
     .reduce((sum, row) => sum + Number(row.qty || 0), 0)
@@ -1164,19 +1214,19 @@ export default function Departments() {
                   </Space>
                 </div>
                 <div className="filter-bar">
-                  <DatePicker
+                  <DatePicker.RangePicker
                     allowClear
-                    placeholder="选择日期"
-                    value={purchaseDate}
-                    onChange={(date) => {
-                      setPurchaseDate(date)
-                      setPurchasePage(1)
+                    placeholder={['开始日期', '结束日期']}
+                    value={purchaseRange}
+                    onChange={(dates) => {
+                      setPurchaseRange(
+                        dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null,
+                      )
                     }}
                   />
                   <Button
                     type="primary"
                     onClick={() => {
-                      setPurchasePage(1)
                       loadPurchaseLogs()
                     }}
                   >
@@ -1184,77 +1234,29 @@ export default function Departments() {
                   </Button>
                 </div>
                 <Spin spinning={purchaseLoading}>
-                  <Table<DepartmentLogItem>
-                    rowKey="id"
-                    dataSource={purchaseLogs}
+                  <Table<PurchaseSummaryRow>
+                    rowKey="key"
+                    dataSource={purchaseSummaryRows}
                     rowSelection={{
                       selectedRowKeys: purchaseSelectedKeys,
                       onChange: handlePurchaseSelectionChange,
                       preserveSelectedRowKeys: true,
-                      getCheckboxProps: (record) => ({
-                        disabled: record.recalled,
-                      }),
                     }}
                     size="middle"
                     scroll={{ x: 900 }}
-                    pagination={{
-                      current: purchasePage,
-                      pageSize: purchasePageSize,
-                      total: purchaseTotal,
-                      showSizeChanger: true,
-                      onChange: (p, s) => {
-                        setPurchasePage(p)
-                        setPurchasePageSize(s)
-                      },
-                    }}
+                    pagination={false}
                     columns={[
-                      { title: '日期', dataIndex: 'date', width: 110 },
-                      {
-                        title: '类型',
-                        dataIndex: 'logType',
-                        width: 110,
-                        render: (type: string) => logTypeLabels[type] || type,
-                      },
                       { title: '商品', dataIndex: 'productName' },
-                      { title: '数量', dataIndex: 'qty', width: 90 },
-                      { title: '单价', dataIndex: 'price', width: 100 },
-                      { title: '金额', dataIndex: 'amount', width: 110 },
+                      { title: '单位', dataIndex: 'unit', width: 90 },
+                      { title: '采购次数', dataIndex: 'count', width: 110 },
+                      { title: '总数量', dataIndex: 'totalQty', width: 110 },
                       {
-                        title: '仓库/部门',
-                        dataIndex: 'targetName',
+                        title: '总金额',
+                        dataIndex: 'totalAmount',
                         width: 130,
-                        render: (value: string) => value || '-',
+                        render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
                       },
-                      { title: '供货商', dataIndex: 'supplier', width: 140 },
-                      { title: '操作人', dataIndex: 'operator', width: 110 },
-                      { title: '备注', dataIndex: 'remark' },
-                      {
-                        title: '操作',
-                        width: 190,
-                        render: (_, record) =>
-                          record.recalled ? (
-                            <Tag color="default">已撤回</Tag>
-                          ) : (
-                            <Space size={0}>
-                              <Button
-                                type="link"
-                                size="small"
-                                icon={<PrinterOutlined />}
-                                onClick={() => openPurchaseVoucher(record)}
-                              >
-                                打印凭证
-                              </Button>
-                              <Button
-                                type="link"
-                                size="small"
-                                danger
-                                onClick={() => confirmPurchaseRecall(record)}
-                              >
-                                撤回
-                              </Button>
-                            </Space>
-                          ),
-                      },
+                      { title: '供货商', dataIndex: 'supplier', width: 180 },
                     ]}
                   />
                 </Spin>
