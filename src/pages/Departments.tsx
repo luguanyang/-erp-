@@ -133,10 +133,12 @@ export default function Departments() {
   })
 
   const [purchaseLoading, setPurchaseLoading] = useState(false)
+  const [purchasePage, setPurchasePage] = useState(1)
+  const [purchasePageSize, setPurchasePageSize] = useState(20)
+  const [purchaseTotal, setPurchaseTotal] = useState(0)
   const [purchaseRange, setPurchaseRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('')
   const [purchaseProductFilter, setPurchaseProductFilter] = useState('')
-  const [purchaseSourceLogs, setPurchaseSourceLogs] = useState<DepartmentLogItem[]>([])
   const [purchaseSummaryRows, setPurchaseSummaryRows] = useState<PurchaseSummaryRow[]>([])
   const [purchaseVoucherOpen, setPurchaseVoucherOpen] = useState(false)
   const [purchaseVoucherGroups, setPurchaseVoucherGroups] = useState<PurchaseVoucherGroup[]>([])
@@ -333,35 +335,28 @@ export default function Departments() {
         purchaseRange && purchaseRange[1]
           ? purchaseRange[1].format('YYYY-MM-DD')
           : ''
-      const all: DepartmentLogItem[] = []
       const types =
         purchaseTypeFilter === 'return'
           ? ['purchase_return']
           : purchaseTypeFilter
             ? [purchaseTypeFilter]
             : ['daily', 'direct', 'purchase_return']
-      let page = 1
-      while (true) {
-        const res = await api.departmentLogs({
-          page,
-          pageSize: 200,
-          types,
-          startDate: start || undefined,
-          endDate: end || undefined,
-          productId: purchaseProductFilter || undefined,
-        })
-        all.push(...res.list)
-        if (!res.list.length || all.length >= res.total) break
-        page += 1
-      }
-      setPurchaseSourceLogs(all)
-      setPurchaseSummaryRows(buildPurchaseSummary(all))
+      const res = await api.departmentPurchaseSummary({
+        page: purchasePage,
+        pageSize: purchasePageSize,
+        types,
+        startDate: start || undefined,
+        endDate: end || undefined,
+        productId: purchaseProductFilter || undefined,
+      })
+      setPurchaseSummaryRows(res.list)
+      setPurchaseTotal(res.total)
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载采购流水失败')
     } finally {
       setPurchaseLoading(false)
     }
-  }, [purchaseRange, purchaseTypeFilter, purchaseProductFilter])
+  }, [purchasePage, purchasePageSize, purchaseRange, purchaseTypeFilter, purchaseProductFilter])
 
   const loadMoveLogs = useCallback(async () => {
     setMoveLoading(true)
@@ -383,6 +378,10 @@ export default function Departments() {
   useEffect(() => {
     if (activeTab === 'purchase') loadPurchaseLogs()
   }, [activeTab, loadPurchaseLogs])
+
+  useEffect(() => {
+    setPurchasePage(1)
+  }, [purchaseRange, purchaseTypeFilter, purchaseProductFilter])
 
   useEffect(() => {
     if (activeTab === 'move') loadMoveLogs()
@@ -408,34 +407,6 @@ export default function Departments() {
   useEffect(() => {
     if (activeTab === 'count') loadCountLogs()
   }, [activeTab, loadCountLogs])
-
-  function buildPurchaseSummary(logs: DepartmentLogItem[]): PurchaseSummaryRow[] {
-    const map = new Map<string, PurchaseSummaryRow>()
-    logs.forEach((log) => {
-      const key = `${log.productId}__${log.unit || ''}`
-      const current = map.get(key)
-      if (current) {
-        current.count += 1
-        current.totalQty += Number(log.qty || 0)
-        current.totalAmount += Number(log.amount || 0)
-        if (log.supplier) current.supplier = log.supplier
-      } else {
-        map.set(key, {
-          key,
-          productId: log.productId || '',
-          productName: log.productName || '未知商品',
-          unit: log.unit || '件',
-          count: 1,
-          totalQty: Number(log.qty || 0),
-          totalAmount: Number(log.amount || 0),
-          supplier: log.supplier || '',
-        })
-      }
-    })
-    return Array.from(map.values()).sort((a, b) =>
-      a.productName.localeCompare(b.productName, 'zh-CN'),
-    )
-  }
 
   async function fetchDepartmentStockRows(departmentId: string) {
     const all: DepartmentStockItem[] = []
@@ -906,36 +877,89 @@ export default function Departments() {
   }
 
   function handlePurchaseSelectionChange(nextKeys: Key[]) {
-    const keySet = new Set(nextKeys.map(String))
-    const selectedProductIds = new Set(
-      purchaseSummaryRows
-        .filter((row) => keySet.has(row.key))
-        .map((row) => row.productId),
-    )
     setPurchaseSelectedKeys(nextKeys)
-    setPurchaseSelectedLogs(
-      purchaseSourceLogs.filter(
-        (row) => !row.recalled && selectedProductIds.has(row.productId),
-      ),
-    )
+    setPurchaseSelectedLogs([])
   }
 
-  function openPurchaseDetail(row: PurchaseSummaryRow) {
+  async function openPurchaseDetail(row: PurchaseSummaryRow) {
     setPurchaseDetailProduct(row)
-    setPurchaseDetailLogs(
-      purchaseSourceLogs.filter((log) => log.productId === row.productId),
-    )
     setPurchaseDetailOpen(true)
+    try {
+      const start =
+        purchaseRange && purchaseRange[0]
+          ? purchaseRange[0].format('YYYY-MM-DD')
+          : ''
+      const end =
+        purchaseRange && purchaseRange[1]
+          ? purchaseRange[1].format('YYYY-MM-DD')
+          : ''
+      const types =
+        purchaseTypeFilter === 'return'
+          ? ['purchase_return']
+          : purchaseTypeFilter
+            ? [purchaseTypeFilter]
+            : ['daily', 'direct', 'purchase_return']
+      const res = await api.departmentLogs({
+        page: 1,
+        pageSize: 100,
+        productId: row.productId,
+        types,
+        startDate: start || undefined,
+        endDate: end || undefined,
+      })
+      setPurchaseDetailLogs(res.list)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载采购明细失败')
+    }
   }
 
-  function printSelectedPurchase() {
-    const selected = purchaseSelectedLogs.filter((record) => !record.recalled)
-    if (!selected.length) {
+  async function printSelectedPurchase() {
+    const selectedRows = purchaseSummaryRows.filter((row) =>
+      purchaseSelectedKeys.includes(row.key),
+    )
+    if (!selectedRows.length) {
       message.warning('请先勾选要打印的采购记录')
       return
     }
-    setPurchaseVoucherGroups(buildPurchaseVoucherGroups(selected))
-    setPurchaseVoucherOpen(true)
+    const start =
+      purchaseRange && purchaseRange[0]
+        ? purchaseRange[0].format('YYYY-MM-DD')
+        : ''
+    const end =
+      purchaseRange && purchaseRange[1]
+        ? purchaseRange[1].format('YYYY-MM-DD')
+        : ''
+    const types =
+      purchaseTypeFilter === 'return'
+        ? ['purchase_return']
+        : purchaseTypeFilter
+          ? [purchaseTypeFilter]
+          : ['daily', 'direct', 'purchase_return']
+
+    try {
+      const logs: DepartmentLogItem[] = []
+      for (const row of selectedRows) {
+        let page = 1
+        while (true) {
+          const res = await api.departmentLogs({
+            page,
+            pageSize: 200,
+            productId: row.productId,
+            types,
+            startDate: start || undefined,
+            endDate: end || undefined,
+          })
+          logs.push(...res.list)
+          if (!res.list.length || logs.length >= res.total) break
+          page += 1
+        }
+      }
+      const selected = logs.filter((record) => !record.recalled)
+      setPurchaseVoucherGroups(buildPurchaseVoucherGroups(selected))
+      setPurchaseVoucherOpen(true)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载打印记录失败')
+    }
   }
 
   function openMove(type: 'issue' | 'return' | 'transfer' | 'sale') {
@@ -1008,13 +1032,42 @@ export default function Departments() {
     .filter((row) => row.direction === 'out')
     .reduce((sum, row) => sum + Number(row.qty || 0), 0)
 
-  function exportPurchaseSummary() {
-    if (!purchaseSummaryRows.length) {
+  async function exportPurchaseSummary() {
+    const start =
+      purchaseRange && purchaseRange[0]
+        ? purchaseRange[0].format('YYYY-MM-DD')
+        : ''
+    const end =
+      purchaseRange && purchaseRange[1]
+        ? purchaseRange[1].format('YYYY-MM-DD')
+        : ''
+    const types =
+      purchaseTypeFilter === 'return'
+        ? ['purchase_return']
+        : purchaseTypeFilter
+          ? [purchaseTypeFilter]
+          : ['daily', 'direct', 'purchase_return']
+    const all: PurchaseSummaryRow[] = []
+    let page = 1
+    while (true) {
+      const res = await api.departmentPurchaseSummary({
+        page,
+        pageSize: 200,
+        types,
+        startDate: start || undefined,
+        endDate: end || undefined,
+        productId: purchaseProductFilter || undefined,
+      })
+      all.push(...res.list)
+      if (!res.list.length || all.length >= res.total) break
+      page += 1
+    }
+    if (!all.length) {
       message.warning('当前没有可导出的采购汇总数据')
       return
     }
     const sheet = XLSX.utils.json_to_sheet(
-      purchaseSummaryRows.map((row) => ({
+      all.map((row) => ({
         商品: row.productName,
         单位: row.unit,
         采购次数: row.count,
@@ -1310,7 +1363,16 @@ export default function Departments() {
                     }}
                     size="middle"
                     scroll={{ x: 900 }}
-                    pagination={false}
+                    pagination={{
+                      current: purchasePage,
+                      pageSize: purchasePageSize,
+                      total: purchaseTotal,
+                      showSizeChanger: true,
+                      onChange: (p, s) => {
+                        setPurchasePage(p)
+                        setPurchasePageSize(s)
+                      },
+                    }}
                     columns={[
                       { title: '商品', dataIndex: 'productName' },
                       { title: '单位', dataIndex: 'unit', width: 90 },

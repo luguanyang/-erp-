@@ -69,6 +69,17 @@ export const api = {
     callAdmin<{ handled: number }>({ action: 'department.count', ...data }),
   departmentLogs: (data: object) =>
     callAdmin<PageResult<DepartmentLogItem>>({ action: 'department.logs', ...data }),
+  departmentPurchaseSummary: (data: object) =>
+    callAdmin<PageResult<{
+      key: string
+      productId: string
+      productName: string
+      unit: string
+      count: number
+      totalQty: number
+      totalAmount: number
+      supplier: string
+    }>>({ action: 'department.purchaseSummary', ...data }),
   departmentLogRecall: (id: string) =>
     callAdmin<{ id: string; recalled: boolean }>({
       action: 'department.logs.recall',
