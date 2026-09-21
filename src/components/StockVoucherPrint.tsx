@@ -27,15 +27,14 @@ export default function StockVoucherPrint({
 }: StockVoucherPrintProps) {
   if (!open) return null
 
-  const pages = groups.flatMap((group) => {
-    const chunks = chunk(group.logs, ITEMS_PER_PAGE)
-    return chunks.map((logs, pageIndex) => ({
-      ...group,
-      logs,
-      pageIndex,
-      pageCount: chunks.length,
-    }))
-  })
+  const allLogs = groups.flatMap((group) => group.logs)
+  const pages = chunk(allLogs, ITEMS_PER_PAGE).map((logs, pageIndex) => ({
+    warehouseName: logs[0]?.warehouseName || groups[0]?.warehouseName || '默认仓库',
+    date: groups[0]?.date || '',
+    logs,
+    pageIndex,
+    pageCount: Math.ceil(allLogs.length / ITEMS_PER_PAGE),
+  }))
   const totalLogs = groups.reduce((sum, group) => sum + group.logs.length, 0)
 
   return createPortal(

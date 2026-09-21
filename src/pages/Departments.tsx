@@ -381,6 +381,8 @@ export default function Departments() {
 
   useEffect(() => {
     setPurchasePage(1)
+    setPurchaseSelectedKeys([])
+    setPurchaseSelectedLogs([])
   }, [purchaseRange, purchaseTypeFilter, purchaseProductFilter])
 
   useEffect(() => {
@@ -1359,7 +1361,7 @@ export default function Departments() {
                     rowSelection={{
                       selectedRowKeys: purchaseSelectedKeys,
                       onChange: handlePurchaseSelectionChange,
-                      preserveSelectedRowKeys: true,
+                      preserveSelectedRowKeys: false,
                     }}
                     size="middle"
                     scroll={{ x: 900 }}
@@ -1371,6 +1373,8 @@ export default function Departments() {
                       onChange: (p, s) => {
                         setPurchasePage(p)
                         setPurchasePageSize(s)
+                        setPurchaseSelectedKeys([])
+                        setPurchaseSelectedLogs([])
                       },
                     }}
                     columns={[
