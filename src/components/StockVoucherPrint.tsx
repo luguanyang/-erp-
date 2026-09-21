@@ -41,7 +41,7 @@ export default function StockVoucherPrint({
     <div className="stock-voucher-overlay">
       <div className="stock-voucher-toolbar">
         <div>
-          <strong>入库报销凭证</strong>
+          <strong>入库凭证</strong>
           <span className="stock-voucher-toolbar-desc">
             {totalLogs > 1
               ? `共 ${totalLogs} 条入库记录，${pages.length} 张凭证`
@@ -79,19 +79,17 @@ export default function StockVoucherPrint({
               className="stock-voucher-page"
               key={`${page.warehouseName}-${page.date}-${pageIndex}-${page.pageIndex}`}
             >
-              <h2 className="stock-voucher-title">入库报销凭证</h2>
-              <div className="stock-voucher-subtitle">
-                {totalLogs > 1 ? '（汇总）' : '（单条）'}
+              <div className="stock-voucher-title-row">
+                <h2 className="stock-voucher-title">入库单</h2>
+                <span className="stock-voucher-no">
+                  No: RK-{page.date}-{String(page.pageIndex + 1).padStart(4, '0')}
+                  {page.pageCount > 1 ? `  ${page.pageIndex + 1}/${page.pageCount}` : ''}
+                </span>
               </div>
               <div className="stock-voucher-meta">
+                <span>申报人：{page.logs[0]?.inboundBy || '-'}</span>
                 <span>仓库：{page.warehouseName || '默认仓库'}</span>
-                <span>日期：{page.date}</span>
-                <span>打印时间：{dayjs().format('YYYY-MM-DD HH:mm')}</span>
-                {page.pageCount > 1 ? (
-                  <span>
-                    第 {page.pageIndex + 1} / {page.pageCount} 张
-                  </span>
-                ) : null}
+                <span>制表日期：{page.date}</span>
               </div>
               <table className="stock-voucher-table">
                 <thead>
@@ -102,8 +100,6 @@ export default function StockVoucherPrint({
                     <th className="stock-voucher-col-qty">数量</th>
                     <th className="stock-voucher-col-price">单价（元）</th>
                     <th className="stock-voucher-col-amount">金额（元）</th>
-                    <th>申报人</th>
-                    <th>操作员</th>
                     <th>备注</th>
                   </tr>
                 </thead>
@@ -127,8 +123,6 @@ export default function StockVoucherPrint({
                         <td className="stock-voucher-right">
                           {amount.toFixed(2)}
                         </td>
-                        <td>{log.inboundBy || '-'}</td>
-                        <td>{log.operatorName || '-'}</td>
                         <td>{log.reason || '-'}</td>
                       </tr>
                     )
@@ -144,22 +138,17 @@ export default function StockVoucherPrint({
                     <td className="stock-voucher-right">
                       {totalAmount.toFixed(2)}
                     </td>
-                    <td colSpan={3} />
+                      <td />
                   </tr>
                 </tfoot>
               </table>
-              <div className="stock-voucher-note">
-                本页 {page.logs.length} 条入库记录
-                {page.logs.length === 1 && page.logs[0].id
-                  ? `，流水号：${page.logs[0].id}`
-                  : ''}
-              </div>
               <div className="stock-voucher-sign">
-                <span>领货人签字：______________</span>
-                <span>报销人签字：______________</span>
+                <span>申报人：{page.logs[0]?.inboundBy || '______________'}</span>
+                <span>仓库负责人：______________</span>
               </div>
               <div className="stock-voucher-sign stock-voucher-sign-second">
-                仓库负责人签字：______________
+                <span>验货人：______________</span>
+                <span>制单人：{page.logs[0]?.operatorName || '______________'}</span>
               </div>
             </div>
           )
