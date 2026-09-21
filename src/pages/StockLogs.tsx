@@ -39,13 +39,20 @@ export default function StockLogs() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryWarehouseId, setSummaryWarehouseId] = useState('')
   const [summaryRange, setSummaryRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [selectedLogs, setSelectedLogs] = useState<StockLogItem[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.stockLogList({ page, pageSize, ...filters })
+      const res = await api.stockLogList({
+        page,
+        pageSize,
+        ...filters,
+        startDate: range && range[0] ? range[0].startOf('day').toISOString() : undefined,
+        endDate: range && range[1] ? range[1].endOf('day').toISOString() : undefined,
+      })
       setList(res.list)
       setTotal(res.total)
     } catch (err) {
@@ -53,7 +60,7 @@ export default function StockLogs() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, filters])
+  }, [page, pageSize, filters, range])
 
   useEffect(() => {
     load()
@@ -61,7 +68,7 @@ export default function StockLogs() {
 
   useEffect(() => {
     setPage(1)
-  }, [filters])
+  }, [filters, range])
 
   useEffect(() => {
     api
@@ -276,6 +283,13 @@ export default function StockLogs() {
             value={filters.subcategory || undefined}
             options={(currentCategory?.subcategories || []).map((s) => ({ value: s, label: s }))}
             onChange={(value) => setFilters((f) => ({ ...f, subcategory: value || '' }))}
+          />
+          <DatePicker.RangePicker
+            allowClear
+            value={range}
+            onChange={(dates) =>
+              setRange(dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null)
+            }
           />
           <Button type="primary" onClick={() => { setPage(1); load() }}>
             查询
