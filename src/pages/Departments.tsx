@@ -135,6 +135,7 @@ export default function Departments() {
   const [purchaseLoading, setPurchaseLoading] = useState(false)
   const [purchaseRange, setPurchaseRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('')
+  const [purchaseProductFilter, setPurchaseProductFilter] = useState('')
   const [purchaseSourceLogs, setPurchaseSourceLogs] = useState<DepartmentLogItem[]>([])
   const [purchaseSummaryRows, setPurchaseSummaryRows] = useState<PurchaseSummaryRow[]>([])
   const [purchaseVoucherOpen, setPurchaseVoucherOpen] = useState(false)
@@ -344,6 +345,7 @@ export default function Departments() {
           types,
           startDate: start || undefined,
           endDate: end || undefined,
+          productId: purchaseProductFilter || undefined,
         })
         all.push(...res.list)
         if (!res.list.length || all.length >= res.total) break
@@ -356,7 +358,7 @@ export default function Departments() {
     } finally {
       setPurchaseLoading(false)
     }
-  }, [purchaseRange, purchaseTypeFilter])
+  }, [purchaseRange, purchaseTypeFilter, purchaseProductFilter])
 
   const loadMoveLogs = useCallback(async () => {
     setMoveLoading(true)
@@ -994,6 +996,26 @@ export default function Departments() {
     .filter((row) => row.direction === 'out')
     .reduce((sum, row) => sum + Number(row.qty || 0), 0)
 
+  function exportPurchaseSummary() {
+    if (!purchaseSummaryRows.length) {
+      message.warning('当前没有可导出的采购汇总数据')
+      return
+    }
+    const sheet = XLSX.utils.json_to_sheet(
+      purchaseSummaryRows.map((row) => ({
+        商品: row.productName,
+        单位: row.unit,
+        采购次数: row.count,
+        总数量: row.totalQty,
+        总金额: Number(row.totalAmount || 0).toFixed(2),
+        供货商: row.supplier || '',
+      })),
+    )
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, sheet, '采购汇总')
+    XLSX.writeFile(workbook, `采购汇总_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`)
+  }
+
   return (
     <>
       <PageHeader
@@ -1233,6 +1255,16 @@ export default function Departments() {
                     ]}
                     onChange={(value) => setPurchaseTypeFilter(value || '')}
                   />
+                  <Select
+                    showSearch
+                    allowClear
+                    optionFilterProp="label"
+                    placeholder="选择商品"
+                    style={{ width: 240 }}
+                    value={purchaseProductFilter || undefined}
+                    options={productOptions}
+                    onChange={(value) => setPurchaseProductFilter(value || '')}
+                  />
                   <DatePicker.RangePicker
                     allowClear
                     placeholder={['开始日期', '结束日期']}
@@ -1250,6 +1282,9 @@ export default function Departments() {
                     }}
                   >
                     查询
+                  </Button>
+                  <Button icon={<DownloadOutlined />} onClick={exportPurchaseSummary}>
+                    导出
                   </Button>
                 </div>
                 <Spin spinning={purchaseLoading}>
