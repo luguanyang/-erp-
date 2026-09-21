@@ -903,15 +903,22 @@ export default function Departments() {
           : purchaseTypeFilter
             ? [purchaseTypeFilter]
             : ['daily', 'direct', 'purchase_return']
-      const res = await api.departmentLogs({
-        page: 1,
-        pageSize: 100,
-        productId: row.productId,
-        types,
-        startDate: start || undefined,
-        endDate: end || undefined,
-      })
-      setPurchaseDetailLogs(res.list)
+      const all: DepartmentLogItem[] = []
+      let page = 1
+      while (true) {
+        const res = await api.departmentLogs({
+          page,
+          pageSize: 200,
+          productId: row.productId,
+          types,
+          startDate: start || undefined,
+          endDate: end || undefined,
+        })
+        all.push(...res.list)
+        if (!res.list.length || all.length >= res.total) break
+        page += 1
+      }
+      setPurchaseDetailLogs(all)
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载采购明细失败')
     }
