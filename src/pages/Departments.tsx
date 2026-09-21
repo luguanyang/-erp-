@@ -133,6 +133,7 @@ export default function Departments() {
   })
 
   const [purchaseLoading, setPurchaseLoading] = useState(false)
+  const [purchasePrintLoading, setPurchasePrintLoading] = useState(false)
   const [purchasePage, setPurchasePage] = useState(1)
   const [purchasePageSize, setPurchasePageSize] = useState(20)
   const [purchaseTotal, setPurchaseTotal] = useState(0)
@@ -947,9 +948,10 @@ export default function Departments() {
           ? [purchaseTypeFilter]
           : ['daily', 'direct', 'purchase_return']
 
+    setPurchasePrintLoading(true)
     try {
-      const logs: DepartmentLogItem[] = []
-      for (const row of selectedRows) {
+      const fetchProductLogs = async (row: PurchaseSummaryRow) => {
+        const logs: DepartmentLogItem[] = []
         let page = 1
         while (true) {
           const res = await api.departmentLogs({
@@ -964,12 +966,16 @@ export default function Departments() {
           if (!res.list.length || logs.length >= res.total) break
           page += 1
         }
+        return logs
       }
+      const logs = (await Promise.all(selectedRows.map(fetchProductLogs))).flat()
       const selected = logs.filter((record) => !record.recalled)
       setPurchaseVoucherGroups(buildPurchaseVoucherGroups(selected))
       setPurchaseVoucherOpen(true)
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载打印记录失败')
+    } finally {
+      setPurchasePrintLoading(false)
     }
   }
 
@@ -1297,6 +1303,7 @@ export default function Departments() {
                     <Button
                       icon={<PrinterOutlined />}
                       disabled={validPurchaseSelectedCount === 0}
+                      loading={purchasePrintLoading}
                       onClick={printSelectedPurchase}
                     >
                       打印选中
