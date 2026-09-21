@@ -142,6 +142,9 @@ export default function Departments() {
   const [purchaseVoucherGroups, setPurchaseVoucherGroups] = useState<PurchaseVoucherGroup[]>([])
   const [purchaseSelectedKeys, setPurchaseSelectedKeys] = useState<Key[]>([])
   const [purchaseSelectedLogs, setPurchaseSelectedLogs] = useState<DepartmentLogItem[]>([])
+  const [purchaseDetailOpen, setPurchaseDetailOpen] = useState(false)
+  const [purchaseDetailProduct, setPurchaseDetailProduct] = useState<PurchaseSummaryRow | null>(null)
+  const [purchaseDetailLogs, setPurchaseDetailLogs] = useState<DepartmentLogItem[]>([])
   const [flowOpen, setFlowOpen] = useState(false)
   const [flowProductId, setFlowProductId] = useState('')
   const [flowRange, setFlowRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
@@ -827,6 +830,7 @@ export default function Departments() {
           message.success('已撤回')
           await loadPurchaseLogs()
           await loadStock()
+          setPurchaseDetailOpen(false)
         } catch (err) {
           message.error(err instanceof Error ? err.message : '撤回失败')
         }
@@ -914,6 +918,14 @@ export default function Departments() {
         (row) => !row.recalled && selectedProductIds.has(row.productId),
       ),
     )
+  }
+
+  function openPurchaseDetail(row: PurchaseSummaryRow) {
+    setPurchaseDetailProduct(row)
+    setPurchaseDetailLogs(
+      purchaseSourceLogs.filter((log) => log.productId === row.productId),
+    )
+    setPurchaseDetailOpen(true)
   }
 
   function printSelectedPurchase() {
@@ -1311,6 +1323,19 @@ export default function Departments() {
                         render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
                       },
                       { title: '供货商', dataIndex: 'supplier', width: 180 },
+                      {
+                        title: '操作',
+                        width: 120,
+                        render: (_, record) => (
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => openPurchaseDetail(record)}
+                          >
+                            明细/撤回
+                          </Button>
+                        ),
+                      },
                     ]}
                   />
                 </Spin>
@@ -1926,6 +1951,67 @@ export default function Departments() {
             ]}
           />
         </Spin>
+      </Modal>
+
+      <Modal
+        title={`采购明细 · ${purchaseDetailProduct?.productName || ''}`}
+        open={purchaseDetailOpen}
+        width={900}
+        onCancel={() => setPurchaseDetailOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Table<DepartmentLogItem>
+          rowKey="id"
+          dataSource={purchaseDetailLogs}
+          size="small"
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+          columns={[
+            { title: '日期', dataIndex: 'date', width: 110 },
+            {
+              title: '类型',
+              dataIndex: 'logType',
+              width: 110,
+              render: (type: string) => logTypeLabels[type] || type,
+            },
+            { title: '数量', dataIndex: 'qty', width: 90 },
+            {
+              title: '金额',
+              dataIndex: 'amount',
+              width: 110,
+              render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
+            },
+            {
+              title: '仓库/部门',
+              dataIndex: 'targetName',
+              width: 130,
+              render: (value: string) => value || '-',
+            },
+            { title: '操作人', dataIndex: 'operator', width: 110 },
+            {
+              title: '状态',
+              dataIndex: 'recalled',
+              width: 100,
+              render: (recalled: boolean) =>
+                recalled ? <Tag color="default">已撤回</Tag> : <Tag color="green">正常</Tag>,
+            },
+            {
+              title: '操作',
+              width: 100,
+              render: (_, record) =>
+                record.recalled ? null : (
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    onClick={() => confirmPurchaseRecall(record)}
+                  >
+                    撤回
+                  </Button>
+                ),
+            },
+          ]}
+        />
       </Modal>
 
       <PurchaseVoucherPrint
