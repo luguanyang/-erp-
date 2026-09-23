@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Button,
-  Drawer,
   Form,
   Input,
   Modal,
@@ -293,11 +292,12 @@ export default function Printers() {
           />
         </Spin>
       </div>
-      <Drawer
+      <Modal
         title={editing ? '编辑打印机' : '新建打印机'}
         width={480}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onCancel={() => setDrawerOpen(false)}
+        footer={null}
         destroyOnClose
       >
         <Form<PrinterForm> form={form} layout="vertical" onFinish={handleFinish}>
@@ -359,12 +359,13 @@ export default function Printers() {
             </Button>
           </Space>
         </Form>
-      </Drawer>
-      <Drawer
+      </Modal>
+      <Modal
         title={stylePrinter ? `打印样式 · ${stylePrinter.name}` : '打印样式'}
         width={680}
         open={styleDrawerOpen}
-        onClose={() => setStyleDrawerOpen(false)}
+        onCancel={() => setStyleDrawerOpen(false)}
+        footer={null}
       >
         <div className="style-inherit-row">
           <div>
@@ -408,7 +409,7 @@ export default function Printers() {
             </Button>
           </Space>
         </div>
-      </Drawer>
+      </Modal>
     </>
   )
 }

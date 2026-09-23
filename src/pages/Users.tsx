@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Button,
-  Drawer,
   Form,
   Input,
   Modal,
@@ -225,11 +224,12 @@ export default function Users() {
           />
         </Spin>
       </div>
-      <Drawer
+      <Modal
         title={editing ? '编辑用户' : '新建用户'}
         width={480}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onCancel={() => setDrawerOpen(false)}
+        footer={null}
         destroyOnClose
       >
         <Form<UserForm> form={form} layout="vertical" onFinish={handleFinish}>
@@ -300,7 +300,7 @@ export default function Users() {
             </Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
     </>
   )
 }

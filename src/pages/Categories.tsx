@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Button,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -168,11 +167,12 @@ export default function Categories() {
           />
         </Spin>
       </div>
-      <Drawer
+      <Modal
         title={editing ? '编辑分类' : '新建分类'}
         width={480}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onCancel={() => setDrawerOpen(false)}
+        footer={null}
         destroyOnClose
       >
         <Form<CategoryForm> form={form} layout="vertical" onFinish={handleFinish}>
@@ -251,7 +251,7 @@ export default function Categories() {
             </Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
     </>
   )
 }

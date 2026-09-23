@@ -4,7 +4,6 @@ import {
   Checkbox,
   DatePicker,
   Descriptions,
-  Drawer,
   Input,
   InputNumber,
   Modal,
@@ -280,11 +279,12 @@ export default function Orders() {
           />
         </Spin>
       </div>
-      <Drawer
+      <Modal
         title="订单详情"
         width={640}
         open={!!detail}
-        onClose={() => setDetail(null)}
+        onCancel={() => setDetail(null)}
+        footer={null}
         loading={detailLoading}
       >
         {detail ? (
@@ -349,7 +349,7 @@ export default function Orders() {
             />
           </Space>
         ) : null}
-      </Drawer>
+      </Modal>
       <Modal
         title="打印订单"
         open={printOpen}

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Avatar,
   Button,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -390,11 +389,12 @@ export default function Products() {
           />
         </Spin>
       </div>
-      <Drawer
+      <Modal
         title={editing ? '编辑商品' : '新建商品'}
         width={520}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onCancel={() => setDrawerOpen(false)}
+        footer={null}
         destroyOnClose
       >
         <Form<ProductForm>
@@ -490,7 +490,7 @@ export default function Products() {
             </Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
     </>
   )
 }

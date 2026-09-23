@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Button,
-  Drawer,
   Form,
   Input,
   Modal,
@@ -164,11 +163,12 @@ export default function Stores() {
           />
         </Spin>
       </div>
-      <Drawer
+      <Modal
         title={editing ? '编辑门店' : '新建门店'}
         width={480}
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onCancel={() => setDrawerOpen(false)}
+        footer={null}
         destroyOnClose
       >
         <Form<StoreForm> form={form} layout="vertical" onFinish={handleFinish}>
@@ -202,7 +202,7 @@ export default function Stores() {
             </Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
     </>
   )
 }

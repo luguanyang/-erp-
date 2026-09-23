@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Button,
   DatePicker,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -979,11 +978,13 @@ export default function Inventory() {
         </Form>
       </Modal>
 
-      <Drawer
+      <Modal
         title="批量入库"
         width={920}
         open={batchOpen}
-        onClose={() => setBatchOpen(false)}
+        onCancel={() => setBatchOpen(false)}
+        footer={null}
+        destroyOnClose
       >
         <Form<BatchInboundForm>
           form={batchForm}
@@ -1134,7 +1135,7 @@ export default function Inventory() {
             </Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
 
       <StockVoucherPrint
         open={stockVoucherOpen}

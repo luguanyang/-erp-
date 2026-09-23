@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, type Key } from 'react'
 import {
   Button,
   DatePicker,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -1716,11 +1715,13 @@ export default function Departments() {
         </Form>
       </Modal>
 
-      <Drawer
+      <Modal
         title={`${logTypeLabels[purchaseType === 'return' ? 'purchase_return' : purchaseType] || '采购'}录入`}
         width={840}
         open={purchaseOpen}
-        onClose={() => setPurchaseOpen(false)}
+        onCancel={() => setPurchaseOpen(false)}
+        footer={null}
+        destroyOnClose
       >
         <Form<EntryForm> form={purchaseForm} layout="vertical" onFinish={handlePurchaseFinish}>
           <Space size={12} style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1889,13 +1890,15 @@ export default function Departments() {
             <Button type="primary" htmlType="submit" loading={saving}>保存</Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
 
-      <Drawer
+      <Modal
         title={`${logTypeLabels[moveType] || '库存变动'}录入`}
         width={720}
         open={moveOpen}
-        onClose={() => setMoveOpen(false)}
+        onCancel={() => setMoveOpen(false)}
+        footer={null}
+        destroyOnClose
       >
         <Form<EntryForm> form={moveForm} layout="vertical" onFinish={handleMoveFinish}>
           <Space size={12} style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1953,7 +1956,7 @@ export default function Departments() {
             <Button type="primary" htmlType="submit" loading={saving}>保存</Button>
           </Space>
         </Form>
-      </Drawer>
+      </Modal>
 
       <Modal
         title="商品进出货查询"
