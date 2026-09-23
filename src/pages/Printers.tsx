@@ -298,6 +298,8 @@ export default function Printers() {
         open={drawerOpen}
         onCancel={() => setDrawerOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<PrinterForm> form={form} layout="vertical" onFinish={handleFinish}>
@@ -366,6 +368,8 @@ export default function Printers() {
         open={styleDrawerOpen}
         onCancel={() => setStyleDrawerOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
       >
         <div className="style-inherit-row">
           <div>

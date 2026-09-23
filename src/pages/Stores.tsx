@@ -169,6 +169,8 @@ export default function Stores() {
         open={drawerOpen}
         onCancel={() => setDrawerOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<StoreForm> form={form} layout="vertical" onFinish={handleFinish}>

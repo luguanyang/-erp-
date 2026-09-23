@@ -230,6 +230,8 @@ export default function Users() {
         open={drawerOpen}
         onCancel={() => setDrawerOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<UserForm> form={form} layout="vertical" onFinish={handleFinish}>

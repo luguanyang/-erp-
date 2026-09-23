@@ -984,6 +984,8 @@ export default function Inventory() {
         open={batchOpen}
         onCancel={() => setBatchOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<BatchInboundForm>

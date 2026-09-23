@@ -173,6 +173,8 @@ export default function Categories() {
         open={drawerOpen}
         onCancel={() => setDrawerOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<CategoryForm> form={form} layout="vertical" onFinish={handleFinish}>

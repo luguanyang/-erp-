@@ -285,6 +285,8 @@ export default function Orders() {
         open={!!detail}
         onCancel={() => setDetail(null)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         loading={detailLoading}
       >
         {detail ? (

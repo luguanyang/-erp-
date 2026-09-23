@@ -1721,6 +1721,8 @@ export default function Departments() {
         open={purchaseOpen}
         onCancel={() => setPurchaseOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<EntryForm> form={purchaseForm} layout="vertical" onFinish={handlePurchaseFinish}>
@@ -1898,6 +1900,8 @@ export default function Departments() {
         open={moveOpen}
         onCancel={() => setMoveOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<EntryForm> form={moveForm} layout="vertical" onFinish={handleMoveFinish}>

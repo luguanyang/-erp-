@@ -395,6 +395,8 @@ export default function Products() {
         open={drawerOpen}
         onCancel={() => setDrawerOpen(false)}
         footer={null}
+        maskClosable={false}
+        keyboard={false}
         destroyOnClose
       >
         <Form<ProductForm>
