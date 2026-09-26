@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -28,10 +32,11 @@ import { api } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import PageHeader from '../components/PageHeader'
 import StockVoucherPrint from '../components/StockVoucherPrint'
+import { matchesProductText } from '../utils/pinyin'
 import type {
   CategoryItem,
   InventoryItem,
-  ProductItem,
+  ProductOption,
   StockLogItem,
   StockVoucherGroup,
   WarehouseItem,
@@ -91,7 +96,7 @@ export default function Inventory() {
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([])
   const [warehouseStocks, setWarehouseStocks] = useState<Record<string, number>>({})
   const [warehouseLoading, setWarehouseLoading] = useState(false)
-  const [products, setProducts] = useState<ProductItem[]>([])
+  const [products, setProducts] = useState<ProductOption[]>([])
   const [detailLogs, setDetailLogs] = useState<StockLogItem[]>([])
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailProduct, setDetailProduct] = useState<{ id: string; name: string } | null>(null)
@@ -111,6 +116,7 @@ export default function Inventory() {
   const [batchOpen, setBatchOpen] = useState(false)
   const [batchForm] = Form.useForm<BatchInboundForm>()
   const [batchSaving, setBatchSaving] = useState(false)
+  const [productSearchTexts, setProductSearchTexts] = useState<Record<string, string>>({})
   const [stockVoucherOpen, setStockVoucherOpen] = useState(false)
   const [stockVoucherGroups, setStockVoucherGroups] = useState<StockVoucherGroup[]>([])
   const [page, setPage] = useState(1)
@@ -152,7 +158,7 @@ export default function Inventory() {
 
   useEffect(() => {
     api
-      .productList({ page: 1, pageSize: 200 })
+      .productOptions()
       .then((res) => setProducts(res.list))
       .catch(() => undefined)
   }, [])
@@ -347,6 +353,7 @@ export default function Inventory() {
   }
 
   function openBatchInbound() {
+    setProductSearchTexts({})
     batchForm.resetFields()
     batchForm.setFieldsValue({
       date: dayjs(),
@@ -356,7 +363,7 @@ export default function Inventory() {
       creator: currentUser?.name || '',
       inspector: '',
       departmentManager: '',
-      items: [{ productId: undefined, qty: 1, price: 0, amount: 0, remark: '' }],
+      items: [{ productId: undefined, qty: undefined, remark: '' }],
     })
     setBatchOpen(true)
   }
@@ -440,7 +447,7 @@ export default function Inventory() {
       return
     }
 
-    if (changed === 'price' && qty > 0 && price >= 0) {
+    if (changed === 'price' && qty > 0 && value != null && price >= 0) {
       const nextAmount = Math.round(qty * price * 100) / 100
       batchForm.setFieldValue(['items', index, 'amount'], nextAmount)
     }
@@ -1026,6 +1033,7 @@ export default function Inventory() {
 
           <div className="dept-entry-head dept-entry-purchase-head">
             <span>商品</span>
+            <span>单位</span>
             <span>数量</span>
             <span>单价</span>
             <span>总额</span>
@@ -1047,7 +1055,90 @@ export default function Inventory() {
                         optionFilterProp="label"
                         placeholder="选择商品"
                         options={productOptions}
+                        onSearch={(value) =>
+                          setProductSearchTexts((prev) => ({
+                            ...prev,
+                            [field.name]: value || '',
+                          }))
+                        }
+                        filterOption={(input, option) => {
+                          const keyword = String(input || '').trim()
+                          if (!keyword) return true
+                          return matchesProductText(keyword, option?.label)
+                        }}
+                        optionRender={(option) => {
+                          const keyword = (
+                            productSearchTexts[field.name] || ''
+                          ).trim()
+                          if (!keyword) return option.label
+                          const visibleOptions = productOptions.filter((item) =>
+                            matchesProductText(keyword, item.label),
+                          )
+                          const index = visibleOptions.findIndex(
+                            (item) => item.value === option.value,
+                          )
+                          return (
+                            <span>
+                              {index >= 0 ? `${index + 1}. ` : ''}
+                              {option.label}
+                            </span>
+                          )
+                        }}
+                        onChange={() =>
+                          setProductSearchTexts((prev) => {
+                            const next = { ...prev }
+                            delete next[field.name]
+                            return next
+                          })
+                        }
+                        onInputKeyDown={(event) => {
+                          if (!/^[0-9]$/.test(event.key)) return
+                          const keyword = String(event.currentTarget.value || '').trim()
+                          if (!keyword) return
+                          const visibleOptions = productOptions.filter((option) =>
+                            matchesProductText(keyword, option.label),
+                          )
+                          const index = event.key === '0' ? 9 : Number(event.key) - 1
+                          const target = visibleOptions[index]
+                          if (!target) return
+                          event.preventDefault()
+                          event.stopPropagation()
+                          batchForm.setFieldValue(
+                            ['items', field.name, 'productId'],
+                            target.value,
+                          )
+                          setProductSearchTexts((prev) => {
+                            const next = { ...prev }
+                            delete next[field.name]
+                            return next
+                          })
+                        }}
                       />
+                    </Form.Item>
+                    <Form.Item
+                      className="dept-entry-field"
+                      shouldUpdate={(prev, next) =>
+                        prev.items?.[field.name]?.productId !==
+                        next.items?.[field.name]?.productId
+                      }
+                    >
+                      {() => {
+                        const productId = batchForm.getFieldValue([
+                          'items',
+                          field.name,
+                          'productId',
+                        ])
+                        const unit =
+                          products.find((p) => p.id === productId)?.unit || ''
+                        return (
+                          <Input
+                            value={unit}
+                            disabled
+                            placeholder="单位"
+                            style={{ width: '100%' }}
+                          />
+                        )
+                      }}
                     </Form.Item>
                     <Form.Item
                       className="dept-entry-field"
@@ -1115,7 +1206,7 @@ export default function Inventory() {
                   block
                   icon={<PlusOutlined />}
                   onClick={() =>
-                    add({ productId: undefined, qty: 1, price: 0, amount: 0, remark: '' })
+                    add({ productId: undefined, qty: undefined, remark: '' })
                   }
                 >
                   添加商品

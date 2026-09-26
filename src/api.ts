@@ -15,6 +15,7 @@ import type {
   PrinterItem,
   PrintLogItem,
   PrintTemplate,
+  ProductOption,
   ProductItem,
   StatsSummary,
   StockCountLogItem,
@@ -72,18 +73,28 @@ export const api = {
   departmentPurchaseSummary: (data: object) =>
     callAdmin<PageResult<{
       key: string
-      productId: string
-      productName: string
-      unit: string
-      count: number
+      receiptNo: string
+      date: string
+      logType: string
+      supplier: string
+      targetName: string
+      operator: string
+      itemCount: number
       totalQty: number
       totalAmount: number
-      supplier: string
+      items: DepartmentLogItem[]
     }>>({ action: 'department.purchaseSummary', ...data }),
   departmentLogRecall: (id: string) =>
     callAdmin<{ id: string; recalled: boolean }>({
       action: 'department.logs.recall',
       id,
+    }),
+  departmentLogUpdate: (data: object) =>
+    callAdmin<{ id: string }>({ action: 'department.logs.update', ...data }),
+  departmentLogsRecallBatch: (data: object) =>
+    callAdmin<{ recalled: number; productIds: string[] }>({
+      action: 'department.logs.recallBatch',
+      ...data,
     }),
 
   categoryList: () => callAdmin<{ list: CategoryItem[] }>({ action: 'category.list' }),
@@ -95,6 +106,8 @@ export const api = {
 
   productList: (data: object) =>
     callAdmin<PageResult<ProductItem>>({ action: 'product.list', ...data }),
+  productOptions: () =>
+    callAdmin<{ list: ProductOption[] }>({ action: 'product.options' }),
   productCreate: (data: object) =>
     callAdmin<{ id: string }>({ action: 'product.create', ...data }),
   productUpdate: (data: object) =>

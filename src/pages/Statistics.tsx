@@ -15,7 +15,6 @@ import {
   message,
 } from 'antd'
 import { DownloadOutlined, SearchOutlined } from '@ant-design/icons'
-import * as XLSX from 'xlsx'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
@@ -78,11 +77,12 @@ export default function Statistics() {
     }
   }
 
-  function exportExcel() {
+  async function exportExcel() {
     if (!stats || !stats.groups.length) {
       message.warning('暂无可导出的统计数据')
       return
     }
+    const XLSX = await import('xlsx')
     const rows: Array<Array<string | number>> = []
     const storeName = storeId
       ? stores.find((s) => s.id === storeId)?.name || ''

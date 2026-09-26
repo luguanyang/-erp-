@@ -19,6 +19,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
+    const timeout = setTimeout(() => {
+      if (active) setLoading(false)
+    }, 5000)
     async function restore() {
       try {
         const sessionResult = await auth.getSession()
@@ -28,12 +31,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         await auth.signOut().catch(() => undefined)
       } finally {
+        clearTimeout(timeout)
         if (active) setLoading(false)
       }
     }
     restore()
     return () => {
       active = false
+      clearTimeout(timeout)
     }
   }, [])
 

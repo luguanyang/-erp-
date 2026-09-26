@@ -309,7 +309,7 @@ body {
 
 .dept-entry-purchase-head,
 .dept-entry-purchase-row {
-  grid-template-columns: minmax(240px, 1fr) 90px 110px 120px minmax(120px, 0.8fr) 44px;
+  grid-template-columns: minmax(180px, 1fr) 60px 80px 100px 110px minmax(90px, 0.7fr) 40px;
 }
 
 .dept-entry-row .ant-form-item {
@@ -786,4 +786,11 @@ body {
     break-after: auto;
     page-break-after: auto;
   }
+}
+
+.ant-select-dropdown {
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.35),
+    0 24px 64px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(20, 24, 30, 0.16);
 }

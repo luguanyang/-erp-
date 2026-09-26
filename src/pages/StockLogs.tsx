@@ -13,7 +13,6 @@ import {
 } from 'antd'
 import { DownloadOutlined, PrinterOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import * as XLSX from 'xlsx'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
 import StockVoucherPrint from '../components/StockVoucherPrint'
@@ -157,7 +156,7 @@ export default function StockLogs() {
     setVoucherOpen(true)
   }
 
-  function exportSelected() {
+  async function exportSelected() {
     const rows = selectedLogs.filter(
       (record) => record.type === 'in' && !record.recalled,
     )
@@ -165,6 +164,7 @@ export default function StockLogs() {
       message.warning('请先勾选要导出的入库记录')
       return
     }
+    const XLSX = await import('xlsx')
     const sheet = XLSX.utils.json_to_sheet(
       rows.map((row) => ({
         商品: row.productName,

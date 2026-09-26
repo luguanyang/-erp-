@@ -55,6 +55,8 @@ export interface DepartmentStockItem {
 
 export interface DepartmentLogItem {
   id: string
+  receiptNo: string
+  lineNo: number | null
   logType: string
   direction: string
   supplier: string
@@ -113,6 +115,14 @@ export interface ProductItem {
   stock: number
   minStock: number
   low: boolean
+}
+
+export interface ProductOption {
+  id: string
+  name: string
+  spec: string
+  unit: string
+  status: 'active' | 'disabled'
 }
 
 export interface InventoryItem {

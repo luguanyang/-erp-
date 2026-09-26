@@ -1,3 +1,4 @@
+import { lazy, Suspense, type ReactNode } from 'react'
 import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -6,26 +7,27 @@ import 'dayjs/locale/zh-cn'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import AdminLayout from './layouts/AdminLayout'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Stores from './pages/Stores'
-import Categories from './pages/Categories'
-import Products from './pages/Products'
-import Inventory from './pages/Inventory'
-import StockLogs from './pages/StockLogs'
-import ProcessLogs from './pages/ProcessLogs'
-import StockCountLogs from './pages/StockCountLogs'
-import Warehouses from './pages/Warehouses'
-import Departments from './pages/Departments'
-import Orders from './pages/Orders'
-import Users from './pages/Users'
-import Printers from './pages/Printers'
-import PrintTemplates from './pages/PrintTemplates'
-import PrintLogs from './pages/PrintLogs'
-import Statistics from './pages/Statistics'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Stores = lazy(() => import('./pages/Stores'))
+const Categories = lazy(() => import('./pages/Categories'))
+const Products = lazy(() => import('./pages/Products'))
+const Inventory = lazy(() => import('./pages/Inventory'))
+const StockLogs = lazy(() => import('./pages/StockLogs'))
+const ProcessLogs = lazy(() => import('./pages/ProcessLogs'))
+const StockCountLogs = lazy(() => import('./pages/StockCountLogs'))
+const Warehouses = lazy(() => import('./pages/Warehouses'))
+const Departments = lazy(() => import('./pages/Departments'))
+const Orders = lazy(() => import('./pages/Orders'))
+const Users = lazy(() => import('./pages/Users'))
+const Printers = lazy(() => import('./pages/Printers'))
+const PrintTemplates = lazy(() => import('./pages/PrintTemplates'))
+const PrintLogs = lazy(() => import('./pages/PrintLogs'))
+const Statistics = lazy(() => import('./pages/Statistics'))
 
 dayjs.locale('zh-cn')
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) {
     return <div className="loading-screen">正在验证登录状态...</div>
@@ -84,7 +86,9 @@ export default function App() {
       }}
     >
       <AuthProvider>
-        <RouterProvider router={router} />
+        <Suspense fallback={<div className="loading-screen">页面加载中...</div>}>
+          <RouterProvider router={router} />
+        </Suspense>
       </AuthProvider>
     </ConfigProvider>
   )
