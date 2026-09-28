@@ -34,6 +34,7 @@ const menuItems = [
       { key: '/inventory/logs', icon: <FileTextOutlined />, label: '出入库记录' },
       { key: '/inventory/process', icon: <ExperimentOutlined />, label: '加工记录' },
       { key: '/inventory/counts', icon: <AuditOutlined />, label: '盘存记录' },
+      { key: '/inventory/store-count', icon: <AuditOutlined />, label: '门店盘点' },
     ],
   },
   { key: '/warehouses', icon: <DatabaseOutlined />, label: '仓库' },

@@ -6,6 +6,7 @@ import {
   type Key,
 } from 'react'
 import {
+  Alert,
   Button,
   DatePicker,
   Form,
@@ -18,6 +19,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   message,
 } from 'antd'
 import {
@@ -42,10 +44,10 @@ import dayjs, { Dayjs } from 'dayjs'
 import { api } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import PageHeader from '../components/PageHeader'
+import ProductInlineSelect from '../components/ProductInlineSelect'
 import PurchaseVoucherPrint, {
   type PurchaseVoucherGroup,
 } from '../components/PurchaseVoucherPrint'
-import { matchesProductText } from '../utils/pinyin'
 import type {
   CategoryItem,
   DepartmentItem,
@@ -179,7 +181,6 @@ export default function Departments() {
   const [purchaseDetailLogs, setPurchaseDetailLogs] = useState<DepartmentLogItem[]>([])
   const [editingPurchaseLog, setEditingPurchaseLog] = useState<DepartmentLogItem | null>(null)
   const [purchaseLogEditSaving, setPurchaseLogEditSaving] = useState(false)
-  const [productSearchTexts, setProductSearchTexts] = useState<Record<string, string>>({})
   const [flowOpen, setFlowOpen] = useState(false)
   const [flowProductId, setFlowProductId] = useState('')
   const [flowRange, setFlowRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
@@ -201,6 +202,7 @@ export default function Departments() {
 
   const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [purchaseType, setPurchaseType] = useState<'daily' | 'direct' | 'return'>('daily')
+  const [appendReceiptNo, setAppendReceiptNo] = useState('')
   const [moveOpen, setMoveOpen] = useState(false)
   const [moveType, setMoveType] = useState<'issue' | 'return' | 'transfer' | 'sale'>('issue')
   const [countLogs, setCountLogs] = useState<DepartmentLogItem[]>([])
@@ -372,7 +374,7 @@ export default function Departments() {
     }
   }
 
-  const loadPurchaseLogs = useCallback(async () => {
+  const loadPurchaseLogs = useCallback(async (targetPage = purchasePage) => {
     setPurchaseLoading(true)
     try {
       const start =
@@ -390,7 +392,7 @@ export default function Departments() {
             ? [purchaseTypeFilter]
             : ['daily', 'direct', 'purchase_return']
       const res = await api.departmentPurchaseSummary({
-        page: purchasePage,
+        page: targetPage,
         pageSize: purchasePageSize,
         types,
         startDate: start || undefined,
@@ -399,8 +401,11 @@ export default function Departments() {
       })
       setPurchaseSummaryRows(res.list)
       setPurchaseTotal(res.total)
+      if (targetPage !== purchasePage) setPurchasePage(targetPage)
+      return res.list
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载采购流水失败')
+      return []
     } finally {
       setPurchaseLoading(false)
     }
@@ -592,6 +597,17 @@ export default function Departments() {
     return log.direction === 'out' ? -Number(log.qty || 0) : Number(log.qty || 0)
   }
 
+  function departmentLogQuantity(log: DepartmentLogItem) {
+    return log.logType === 'count' ? Number(log.diff || 0) : Number(log.qty || 0)
+  }
+
+  function departmentLogDepartments(log: DepartmentLogItem) {
+    const names: string[] = []
+    if (log.fromType === 'department' && log.fromName) names.push(log.fromName)
+    if (log.toType === 'department' && log.toName) names.push(log.toName)
+    return Array.from(new Set(names)).join(' → ') || log.targetName || '-'
+  }
+
   function openStockStats() {
     setStatsRows([])
     setStatsSummary(null)
@@ -604,8 +620,8 @@ export default function Departments() {
   async function queryStockStats() {
     const start = statsRange && statsRange[0] ? statsRange[0].format('YYYY-MM-DD') : ''
     const end = statsRange && statsRange[1] ? statsRange[1].format('YYYY-MM-DD') : ''
-    if (!statsDepartmentId || !statsProductIds.length || !start || !end) {
-      message.warning('请选择部门、商品和时间段')
+    if (!statsProductIds.length || !start || !end) {
+      message.warning('请选择商品和时间段')
       return
     }
     if (start > end) {
@@ -629,16 +645,26 @@ export default function Departments() {
         page += 1
       }
 
-      const stockRes = await api.departmentStock({
-        page: 1,
-        pageSize: 200,
-        departmentId: statsDepartmentId,
-        productIds: statsProductIds,
-      })
-      const currentStock = stockRes.list.reduce(
-        (sum, row) => sum + Number(row.stock || 0),
-        0,
-      )
+      let currentStock = 0
+      let stockPage = 1
+      let stockFetched = 0
+      let stockTotal = 1
+      while (stockFetched < stockTotal) {
+        const stockRes = await api.departmentStock({
+          page: stockPage,
+          pageSize: 200,
+          departmentId: statsDepartmentId || undefined,
+          productIds: statsProductIds,
+        })
+        currentStock += stockRes.list.reduce(
+          (sum, row) => sum + Number(row.stock || 0),
+          0,
+        )
+        stockFetched += stockRes.list.length
+        stockTotal = stockRes.total
+        if (!stockRes.list.length) break
+        stockPage += 1
+      }
       const activeLogs = all
         .filter((log) => !log.recalled)
         .sort(
@@ -707,11 +733,25 @@ export default function Departments() {
       ['净变化', statsSummary.net],
       ['期末库存', statsSummary.closing],
       [],
-      ['日期', '类型', '商品', '方向', '数量', '来源', '去向', '操作人', '备注'],
+      [
+        '日期',
+        '类型',
+        '商品',
+        '部门',
+        '方向',
+        '数量',
+        '单价',
+        '金额',
+        '来源',
+        '去向',
+        '操作人',
+        '备注',
+      ],
       ...statsRows.map((log) => [
         log.date,
         logTypeLabels[log.logType] || log.logType,
         log.productName,
+        departmentLogDepartments(log),
         log.logType === 'count'
           ? '调整'
           : log.direction === 'in'
@@ -719,7 +759,9 @@ export default function Departments() {
             : log.direction === 'out'
               ? '出库'
               : log.direction,
-        log.logType === 'count' ? Number(log.diff || 0) : Number(log.qty || 0),
+        departmentLogQuantity(log),
+        Number(log.price || 0),
+        Number(log.amount || 0),
         log.fromName || '',
         log.toName || '',
         log.operator,
@@ -727,12 +769,27 @@ export default function Departments() {
       ]),
     ]
     const sheet = XLSX.utils.aoa_to_sheet(rows)
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:L1')
+    for (let rowIndex = 12; rowIndex <= range.e.r; rowIndex += 1) {
+      for (const columnIndex of [6, 7]) {
+        const cell = sheet[
+          XLSX.utils.encode_cell({
+            r: rowIndex,
+            c: columnIndex,
+          })
+        ]
+        if (cell) cell.z = '0.00'
+      }
+    }
     sheet['!cols'] = [
       { wch: 16 },
       { wch: 12 },
       { wch: 18 },
+      { wch: 14 },
       { wch: 10 },
       { wch: 10 },
+      { wch: 10 },
+      { wch: 12 },
       { wch: 14 },
       { wch: 14 },
       { wch: 14 },
@@ -806,21 +863,63 @@ export default function Departments() {
     })
   }
 
-  function openPurchase(type: 'daily' | 'direct' | 'return') {
-    setPurchaseType(type)
-    setProductSearchTexts({})
+  function getReceiptPurchaseMeta(row: PurchaseSummaryRow) {
+    const active = (row.items || []).find((item) => !item.recalled)
+    if (!row.receiptNo || !active) return null
+    const purchaseType: 'daily' | 'direct' | 'return' =
+      active.logType === 'purchase_return'
+        ? 'return'
+        : active.logType === 'direct'
+          ? 'direct'
+          : 'daily'
+    const targetType: 'warehouse' | 'department' =
+      active.logType === 'purchase_return'
+        ? active.fromType === 'department'
+          ? 'department'
+          : 'warehouse'
+        : active.toType === 'department'
+          ? 'department'
+          : 'warehouse'
+    const targetId =
+      active.logType === 'purchase_return' ? active.fromId : active.toId
+    if (!targetId) return null
+    return {
+      receiptNo: row.receiptNo,
+      purchaseType,
+      targetType,
+      targetId,
+    }
+  }
+
+  function openPurchase(type: 'daily' | 'direct' | 'return', receipt?: PurchaseSummaryRow) {
+    const receiptMeta = receipt ? getReceiptPurchaseMeta(receipt) : null
+    setPurchaseType(receiptMeta ? receiptMeta.purchaseType : type)
+    setAppendReceiptNo(receiptMeta ? receiptMeta.receiptNo : '')
     purchaseForm.resetFields()
     purchaseForm.setFieldsValue({
-      date: dayjs(),
-      supplier: '',
+      date: receipt ? dayjs(receipt.date) : dayjs(),
+      supplier: receipt ? receipt.supplier : '',
       creator: currentUser?.name || '',
       inspector: '',
       departmentManager: '',
-      targetType: 'warehouse',
-      targetId: undefined,
+      targetType: receiptMeta ? receiptMeta.targetType : 'warehouse',
+      targetId: receiptMeta ? receiptMeta.targetId : undefined,
       items: [{ productId: undefined, qty: undefined }],
     })
+    if (receipt) setPurchaseDetailOpen(false)
     setPurchaseOpen(true)
+  }
+
+  function openPurchaseForReceipt(row: PurchaseSummaryRow) {
+    if (!row.receiptNo) {
+      message.warning('历史单无法追加，请新建采购单')
+      return
+    }
+    if (!getReceiptPurchaseMeta(row)) {
+      message.warning('该单据没有可继续添加的有效明细')
+      return
+    }
+    openPurchase(getReceiptPurchaseMeta(row)!.purchaseType, row)
   }
 
   function purchaseDraftKey() {
@@ -980,6 +1079,7 @@ export default function Departments() {
 
   async function handlePurchaseFinish(values: EntryForm) {
     setSaving(true)
+    const appendedReceiptNo = appendReceiptNo || undefined
     try {
       const res = await api.departmentPurchase({
         purchaseType,
@@ -988,12 +1088,31 @@ export default function Departments() {
         targetId: values.targetId,
         date: values.date.format('YYYY-MM-DD'),
         items: values.items,
+        receiptNo: appendedReceiptNo,
       })
-      message.success(`采购流水已记录 ${res.handled} 条`)
+      message.success(
+        res.appended
+          ? `已向原采购单追加 ${res.handled} 条商品`
+          : `采购流水已记录 ${res.handled} 条`,
+      )
       setPurchaseOpen(false)
+      setAppendReceiptNo('')
       removePurchaseDraft()
-      await loadPurchaseLogs()
       await loadStock()
+      await loadPurchaseLogs(1)
+      if (res.appended) {
+        const detailRes = await api.departmentPurchaseSummary({
+          page: 1,
+          pageSize: 1,
+          receiptNo: res.receiptNo,
+        })
+        const refreshed = detailRes.list[0]
+        if (refreshed) {
+          setPurchaseDetailProduct(refreshed)
+          setPurchaseDetailLogs(refreshed.items || [])
+          setPurchaseDetailOpen(true)
+        }
+      }
     } catch (err) {
       message.error(err instanceof Error ? err.message : '保存采购失败')
     } finally {
@@ -1321,6 +1440,21 @@ export default function Departments() {
   }
 
   const currentCategory = categories.find((c) => c.key === stockFilters.category)
+  const isAppendingPurchase = !!appendReceiptNo
+  const activePurchaseDetailLogs = purchaseDetailLogs.filter(
+    (record) => !record.recalled,
+  )
+  const activePurchaseDetailCount = activePurchaseDetailLogs.length
+  const purchaseDetailTotalQty = activePurchaseDetailLogs.reduce(
+    (sum, record) => sum + Number(record.qty || 0),
+    0,
+  )
+  const purchaseDetailTotalAmount = activePurchaseDetailLogs.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0,
+  )
+  const canAppendPurchase =
+    !!purchaseDetailProduct?.receiptNo && activePurchaseDetailCount > 0
   const productOptions = products.map((p) => ({
     value: p.id,
     label: `${p.name}${p.spec ? `(${p.spec})` : ''}`,
@@ -1377,9 +1511,20 @@ export default function Departments() {
         去向: row.targetName || '',
         商品数: row.itemCount,
         总数量: row.totalQty,
-        总金额: Number(row.totalAmount || 0).toFixed(2),
+        总金额: Number(row.totalAmount || 0),
       })),
     )
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:H1')
+    for (let rowIndex = range.s.r + 1; rowIndex <= range.e.r; rowIndex += 1) {
+      const amountCell =
+        sheet[
+          XLSX.utils.encode_cell({
+            r: rowIndex,
+            c: 7,
+          })
+        ]
+      if (amountCell) amountCell.z = '0.00'
+    }
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, sheet, '采购汇总')
     XLSX.writeFile(workbook, `采购汇总_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`)
@@ -2044,22 +2189,43 @@ export default function Departments() {
       </Modal>
 
       <Modal
-        title={`${logTypeLabels[purchaseType === 'return' ? 'purchase_return' : purchaseType] || '采购'}录入`}
+        className="product-entry-modal"
+        title={
+          isAppendingPurchase
+            ? `继续添加商品 · ${appendReceiptNo}`
+            : `${logTypeLabels[purchaseType === 'return' ? 'purchase_return' : purchaseType] || '采购'}录入`
+        }
         width={840}
         open={purchaseOpen}
-        onCancel={() => setPurchaseOpen(false)}
+        onCancel={() => {
+          setPurchaseOpen(false)
+          setAppendReceiptNo('')
+        }}
         footer={null}
         maskClosable={false}
         keyboard={false}
         destroyOnClose
       >
         <Form<EntryForm> form={purchaseForm} layout="vertical" onFinish={handlePurchaseFinish}>
+          {isAppendingPurchase ? (
+            <Alert
+              showIcon
+              type="info"
+              style={{ marginBottom: 16 }}
+              message={`正在向原采购单 ${appendReceiptNo} 追加商品`}
+              description={`原单已有 ${activePurchaseDetailCount} 条有效商品。日期、类型、供货商和入库去向沿用原单，新商品保存后会追加到同一单据。`}
+            />
+          ) : null}
           <Space size={12} style={{ display: 'flex', flexWrap: 'wrap' }}>
             <Form.Item name="date" label="日期" rules={[{ required: true }]}>
-              <DatePicker style={{ width: 160 }} />
+              <DatePicker style={{ width: 160 }} disabled={isAppendingPurchase} />
             </Form.Item>
             <Form.Item name="supplier" label="供货商">
-              <Input placeholder="选填，例如：XX 供应商" style={{ width: 180 }} />
+              <Input
+                placeholder="选填，例如：XX 供应商"
+                style={{ width: 180 }}
+                disabled={isAppendingPurchase}
+              />
             </Form.Item>
             <Form.Item name="creator" label="制单人">
               <Input placeholder="制单人" style={{ width: 140 }} />
@@ -2073,6 +2239,7 @@ export default function Departments() {
             <Form.Item name="targetType" label={purchaseType === 'return' ? '退货来源' : '入库去向'} rules={[{ required: true }]}>
               <Select
                 style={{ width: 150 }}
+                disabled={isAppendingPurchase}
                 options={[
                   { value: 'warehouse', label: '仓库' },
                   { value: 'department', label: '部门' },
@@ -2085,6 +2252,7 @@ export default function Departments() {
                 showSearch
                 optionFilterProp="label"
                 style={{ width: 220 }}
+                disabled={isAppendingPurchase}
                 options={(
                   purchaseTargetType === 'department'
                     ? departments.map((d) => ({ value: d.id, label: d.name }))
@@ -2118,84 +2286,17 @@ export default function Departments() {
                       name={[field.name, 'productId']}
                       rules={[{ required: true, message: '请选择商品' }]}
                     >
-                      <Select
+                      <ProductInlineSelect
                         ref={setPurchaseEntryRef(`${field.name}-productId`)}
-                        showSearch
-                        optionFilterProp="label"
                         placeholder="选择商品"
                         options={productOptions}
-                        onSearch={(value) =>
-                          setProductSearchTexts((prev) => ({
-                            ...prev,
-                            [field.name]: value || '',
-                          }))
-                        }
-                        filterOption={(input, option) => {
-                          const keyword = String(input || '').trim()
-                          if (!keyword) return true
-                          return matchesProductText(keyword, option?.label)
-                        }}
-                        optionRender={(option) => {
-                          const keyword = (
-                            productSearchTexts[field.name] || ''
-                          ).trim()
-                          if (!keyword) return option.label
-                          const visibleOptions = productOptions.filter((item) =>
-                            matchesProductText(keyword, item.label),
-                          )
-                          const index = visibleOptions.findIndex(
-                            (item) => item.value === option.value,
-                          )
-                          return (
-                            <span>
-                              {index >= 0 ? `${index + 1}. ` : ''}
-                              {option.label}
-                            </span>
-                          )
-                        }}
-                        onInputKeyDown={(event) => {
-                          if (!/^[0-9]$/.test(event.key)) return
-                          const keyword = String(event.currentTarget.value || '').trim()
-                          if (!keyword) return
-                          const visibleOptions = productOptions.filter((option) =>
-                            matchesProductText(keyword, option.label),
-                          )
-                          const index = event.key === '0' ? 9 : Number(event.key) - 1
-                          const target = visibleOptions[index]
-                          if (!target) return
-                          event.preventDefault()
-                          event.stopPropagation()
-                          purchaseForm.setFieldValue(
-                            ['items', field.name, 'productId'],
-                            target.value,
-                          )
+                        onCommit={() =>
                           moveToNextPurchaseEntry(
                             field.name,
                             'productId',
                             field.name + 1,
                           )
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            moveToNextPurchaseEntry(
-                              field.name,
-                              'productId',
-                              field.name + 1,
-                            )
-                          }
-                        }}
-                        onChange={(value) => {
-                          setProductSearchTexts((prev) => {
-                            const next = { ...prev }
-                            delete next[field.name]
-                            return next
-                          })
-                          if (value) {
-                            moveToNextPurchaseEntry(field.name, 'productId', field.name + 1)
-                          }
-                        }}
+                        }
                       />
                     </Form.Item>
                     <Form.Item
@@ -2357,12 +2458,27 @@ export default function Departments() {
             }}
           </Form.List>
           <Space style={{ marginTop: 20, justifyContent: 'flex-end', width: '100%' }}>
-            <Button onClick={savePurchaseDraft}>暂存</Button>
-            <Button onClick={loadPurchaseDraft}>读取暂存</Button>
-            <Button danger onClick={clearPurchaseDraft}>清空暂存</Button>
-            <Button icon={<PrinterOutlined />} onClick={printCurrentPurchaseDraft}>直接打印</Button>
-            <Button onClick={() => setPurchaseOpen(false)}>取消</Button>
-            <Button type="primary" htmlType="submit" loading={saving}>保存</Button>
+            {!isAppendingPurchase ? (
+              <>
+                <Button onClick={savePurchaseDraft}>暂存</Button>
+                <Button onClick={loadPurchaseDraft}>读取暂存</Button>
+                <Button danger onClick={clearPurchaseDraft}>清空暂存</Button>
+                <Button icon={<PrinterOutlined />} onClick={printCurrentPurchaseDraft}>
+                  直接打印
+                </Button>
+              </>
+            ) : null}
+            <Button
+              onClick={() => {
+                setPurchaseOpen(false)
+                setAppendReceiptNo('')
+              }}
+            >
+              取消
+            </Button>
+            <Button type="primary" htmlType="submit" loading={saving}>
+              {isAppendingPurchase ? '追加保存' : '保存'}
+            </Button>
           </Space>
         </Form>
       </Modal>
@@ -2530,7 +2646,7 @@ export default function Departments() {
             showSearch
             allowClear
             optionFilterProp="label"
-            placeholder="选择部门"
+            placeholder="全部部门（可不选）"
             style={{ width: 200 }}
             value={statsDepartmentId || undefined}
             options={departments.map((d) => ({ value: d.id, label: d.name }))}
@@ -2583,6 +2699,31 @@ export default function Departments() {
             dataSource={statsRows}
             size="small"
             pagination={false}
+            summary={() => {
+              const totalQty = statsRows.reduce(
+                (sum, record) => sum + departmentLogQuantity(record),
+                0,
+              )
+              const totalAmount = statsRows.reduce(
+                (sum, record) => sum + Number(record.amount || 0),
+                0,
+              )
+              return (
+                <Table.Summary.Row>
+                  <Table.Summary.Cell index={0} colSpan={5}>
+                    合计
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={5} align="right">
+                    {totalQty}
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={6} />
+                  <Table.Summary.Cell index={7} align="right">
+                    ¥{totalAmount.toFixed(2)}
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={8} colSpan={4} />
+                </Table.Summary.Row>
+              )
+            }}
             columns={[
               { title: '日期', dataIndex: 'date', width: 110 },
               {
@@ -2592,6 +2733,11 @@ export default function Departments() {
                 render: (type: string) => logTypeLabels[type] || type,
               },
               { title: '商品', dataIndex: 'productName' },
+              {
+                title: '部门',
+                width: 150,
+                render: (_, record) => departmentLogDepartments(record),
+              },
               {
                 title: '方向',
                 dataIndex: 'direction',
@@ -2609,8 +2755,21 @@ export default function Departments() {
                 title: '数量',
                 dataIndex: 'qty',
                 width: 90,
-                render: (value: number, record) =>
-                  record.logType === 'count' ? Number(record.diff || 0) : value,
+                render: (_, record) => departmentLogQuantity(record),
+              },
+              {
+                title: '单价',
+                dataIndex: 'price',
+                width: 100,
+                align: 'right',
+                render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
+              },
+              {
+                title: '金额',
+                dataIndex: 'amount',
+                width: 110,
+                align: 'right',
+                render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
               },
               {
                 title: '来源',
@@ -2632,51 +2791,104 @@ export default function Departments() {
       </Modal>
 
       <Modal
-        title={`采购明细 · ${purchaseDetailProduct?.receiptNo || '历史单'}`}
+        className="purchase-detail-modal"
+        title={
+          <div className="purchase-detail-title">
+            <div className="purchase-detail-title-main">
+              采购明细 · {purchaseDetailProduct?.receiptNo || '历史单'}
+            </div>
+            <div className="purchase-detail-title-meta">
+              {purchaseDetailProduct?.date || '-'} ·{' '}
+              {logTypeLabels[purchaseDetailProduct?.logType || ''] ||
+                purchaseDetailProduct?.logType ||
+                '-'}
+            </div>
+          </div>
+        }
         open={purchaseDetailOpen}
         width={900}
         onCancel={() => setPurchaseDetailOpen(false)}
         footer={null}
         destroyOnClose
       >
+        <div style={{ marginBottom: 8, textAlign: 'right' }}>
+          <Tooltip
+            title={
+              purchaseDetailProduct?.receiptNo
+                ? activePurchaseDetailCount
+                  ? ''
+                  : '该单据没有可继续添加的有效明细'
+                : '历史单无法追加，请新建采购单'
+            }
+          >
+            <span>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                disabled={!canAppendPurchase}
+                onClick={() => {
+                  if (purchaseDetailProduct) openPurchaseForReceipt(purchaseDetailProduct)
+                }}
+              >
+                继续添加商品
+              </Button>
+            </span>
+          </Tooltip>
+        </div>
         <Table<DepartmentLogItem>
+          className="purchase-detail-table"
           rowKey="id"
           dataSource={purchaseDetailLogs}
           size="small"
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+          pagination={false}
+          tableLayout="fixed"
+          scroll={{ y: '60vh' }}
           columns={[
-            { title: '日期', dataIndex: 'date', width: 110 },
             {
-              title: '类型',
-              dataIndex: 'logType',
-              width: 110,
-              render: (type: string) => logTypeLabels[type] || type,
+              title: '序号',
+              width: 50,
+              align: 'center',
+              render: (_, record, index) => record.lineNo ?? index + 1,
             },
-            { title: '商品', dataIndex: 'productName', width: 140 },
-            { title: '数量', dataIndex: 'qty', width: 90 },
+            {
+              title: '商品',
+              dataIndex: 'productName',
+              width: 150,
+              ellipsis: true,
+            },
+            { title: '数量', dataIndex: 'qty', width: 64, align: 'right' },
+            {
+              title: '单价',
+              dataIndex: 'price',
+              width: 80,
+              align: 'right',
+              render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
+            },
             {
               title: '金额',
               dataIndex: 'amount',
-              width: 110,
+              width: 88,
+              align: 'right',
               render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
             },
             {
               title: '仓库/部门',
               dataIndex: 'targetName',
-              width: 130,
+              width: 110,
+              ellipsis: true,
               render: (value: string) => value || '-',
             },
-            { title: '操作人', dataIndex: 'operator', width: 110 },
+            { title: '操作人', dataIndex: 'operator', width: 78 },
             {
               title: '状态',
               dataIndex: 'recalled',
-              width: 100,
+              width: 76,
               render: (recalled: boolean) =>
                 recalled ? <Tag color="default">已撤回</Tag> : <Tag color="green">正常</Tag>,
             },
             {
               title: '操作',
-              width: 150,
+              width: 142,
               render: (_, record) =>
                 record.recalled ? null : (
                   <Space>
@@ -2701,6 +2913,10 @@ export default function Departments() {
             },
           ]}
         />
+        <div className="purchase-detail-total">
+          <span>总数量：{purchaseDetailTotalQty}</span>
+          <span>总金额：¥{purchaseDetailTotalAmount.toFixed(2)}</span>
+        </div>
       </Modal>
 
       <Modal

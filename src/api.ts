@@ -9,6 +9,8 @@ import type {
   InventoryItem,
   OrderDetailData,
   OrderItem,
+  OrderQuantityChange,
+  OrderQuantityUpdateResult,
   PageResult,
   ProcessLogItem,
   StockLogItem,
@@ -18,7 +20,12 @@ import type {
   ProductOption,
   ProductItem,
   StatsSummary,
+  StoreCountDocumentDetail,
+  StoreCountDocumentSummary,
+  StoreCountLogItem,
   StockCountLogItem,
+  StoreStockItem,
+  StockDocumentSummary,
   StoreDetailData,
   StoreItem,
   StockMoveResult,
@@ -63,7 +70,10 @@ export const api = {
   departmentStock: (data: object) =>
     callAdmin<PageResult<DepartmentStockItem>>({ action: 'department.stock', ...data }),
   departmentPurchase: (data: object) =>
-    callAdmin<{ handled: number }>({ action: 'department.purchase', ...data }),
+    callAdmin<{ handled: number; receiptNo: string; appended: boolean }>({
+      action: 'department.purchase',
+      ...data,
+    }),
   departmentMove: (data: object) =>
     callAdmin<{ handled: number }>({ action: 'department.move', ...data }),
   departmentCount: (data: object) =>
@@ -118,13 +128,71 @@ export const api = {
     callAdmin<PageResult<InventoryItem>>({ action: 'inventory.list', ...data }),
   inventoryUpdate: (items: object[]) =>
     callAdmin<{ updated: number }>({ action: 'inventory.update', items }),
+  storeStockList: (data: object) =>
+    callAdmin<PageResult<StoreStockItem>>({ action: 'store.stock.list', ...data }),
+  storeCountSave: (data: object) =>
+    callAdmin<{ countNo: string; handled: number }>({
+      action: 'store.count.save',
+      ...data,
+    }),
+  storeCountDocumentList: (data: object) =>
+    callAdmin<PageResult<StoreCountDocumentSummary>>({
+      action: 'store.countDocument.list',
+      ...data,
+    }),
+  storeCountDocumentDetail: (countNo: string) =>
+    callAdmin<StoreCountDocumentDetail>({
+      action: 'store.countDocument.detail',
+      countNo,
+    }),
+  storeCountDocumentVoid: (countNo: string) =>
+    callAdmin<{ countNo: string; voided: boolean }>({
+      action: 'store.countDocument.void',
+      countNo,
+    }),
+  storeCountLogList: (data: object) =>
+    callAdmin<PageResult<StoreCountLogItem>>({
+      action: 'store.countLog.list',
+      ...data,
+    }),
+  storeCountUpdate: (data: object) =>
+    callAdmin<{
+      id: string
+      storeId: string
+      productId: string
+      stockBefore: number
+      counted: number
+      diff: number
+    }>({ action: 'store.count.update', ...data }),
   stockMove: (data: object) =>
     callAdmin<StockMoveResult>({
       action: 'stock.move',
       ...data,
     }),
+  stockBatchMove: (data: object) =>
+    callAdmin<{ handled: number; documentNo: string; type: 'in' | 'out' }>({
+      action: 'stock.batchMove',
+      ...data,
+    }),
   stockLogList: (data: object) =>
     callAdmin<PageResult<StockLogItem>>({ action: 'stock.logs', ...data }),
+  stockDocumentSummary: (data: object) =>
+    callAdmin<PageResult<StockDocumentSummary>>({
+      action: 'stock.documentSummary',
+      ...data,
+    }),
+  stockDocumentAppend: (data: object) =>
+    callAdmin<{ handled: number; documentNo: string; appended: boolean }>({
+      action: 'stock.document.append',
+      ...data,
+    }),
+  stockLogUpdate: (data: object) =>
+    callAdmin<{ id: string }>({ action: 'stock.log.update', ...data }),
+  stockLogsRecallBatch: (data: object) =>
+    callAdmin<{ recalled: number; productIds: string[] }>({
+      action: 'stock.logs.recallBatch',
+      ...data,
+    }),
   stockLogRecall: (id: string) =>
     callAdmin<{ id: string; recalled: boolean; stockBefore: number; stockAfter: number }>({
       action: 'stock.logs.recall',
@@ -155,6 +223,8 @@ export const api = {
     callAdmin<OrderDetailData>({ action: 'order.detail', orderNo }),
   orderCancel: (orderNo: string) =>
     callAdmin<{ orderNo: string; status: string }>({ action: 'order.cancel', orderNo }),
+  orderUpdateQty: (data: { orderNo: string; changes: OrderQuantityChange[] }) =>
+    callAdmin<OrderQuantityUpdateResult>({ action: 'order.updateQty', ...data }),
 
   userList: (data: object) =>
     callAdmin<PageResult<UserItem>>({ action: 'user.list', ...data }),

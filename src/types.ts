@@ -144,6 +144,108 @@ export interface InventoryItem {
   low: boolean
 }
 
+export interface StoreStockItem {
+  id: string
+  storeId: string
+  storeName: string
+  productId: string
+  productName: string
+  spec: string
+  categoryKey: string
+  categoryName: string
+  subcategory: string
+  unit: string
+  stock: number
+  counted: number | null
+  diff: number | null
+  lastLogId: string
+  lastCountedAt: string | Date | null
+  lastOperator: string
+}
+
+export interface StoreCountLogItem {
+  id: string
+  documentNo: string
+  countNo: string
+  lineNo: number | null
+  storeId: string
+  storeName: string
+  productId: string
+  productName: string
+  spec: string
+  unit: string
+  stockBefore: number
+  bookQty: number
+  counted: number
+  countedQty: number
+  stockAfter: number
+  diff: number
+  price: number
+  amount: number
+  operator: string
+  operatorAccount: string
+  source: string
+  correctionOf: string
+  date: string
+  remark: string
+  createdAt: string | Date
+  voided: boolean
+  voidedAt: string | Date | null
+  voidedBy: string
+  isLatest: boolean
+}
+
+export interface StoreCountDocumentItem {
+  id: string
+  lineNo: number | null
+  productId: string
+  productName: string
+  spec: string
+  unit: string
+  bookQty: number
+  countedQty: number
+  diff: number
+  price: number
+  amount: number
+  remark: string
+  operator: string
+  source: string
+  isLatest: boolean
+  documentVoided: boolean
+}
+
+export interface StoreCountDocumentSummary {
+  id: string
+  countNo: string
+  storeId: string
+  storeName: string
+  date: string
+  scopeType: 'all' | 'selected'
+  includeZero: boolean
+  onlyBusiness: boolean
+  status: 'active' | 'voided'
+  itemCount: number
+  totalBookQty: number
+  totalCountedQty: number
+  totalDiff: number
+  gainQty: number
+  lossQty: number
+  gainAmount: number
+  lossAmount: number
+  netAmount: number
+  operator: string
+  remark: string
+  createdAt: string | Date
+  updatedAt: string | Date
+  voidedAt?: string | Date | null
+  voidedBy?: string
+}
+
+export interface StoreCountDocumentDetail {
+  document: StoreCountDocumentSummary
+  items: StoreCountDocumentItem[]
+}
+
 export interface StockCountLogItem {
   id: string
   productId: string
@@ -176,6 +278,10 @@ export interface ProcessLogItem {
 
 export interface StockLogItem {
   id: string
+  documentNo: string
+  lineNo: number | null
+  sourceType: string
+  sourceId: string
   productId: string
   productName: string
   spec: string
@@ -201,6 +307,10 @@ export interface StockLogItem {
 
 export interface StockMoveResult {
   logId: string
+  documentNo: string
+  lineNo: number
+  sourceType: string
+  sourceId: string
   productId: string
   type: 'in' | 'out'
   qty: number
@@ -220,6 +330,7 @@ export interface StockMoveResult {
 
 export interface StockVoucherLine {
   id: string
+  lineNo?: number | null
   productName: string
   spec: string
   unit: string
@@ -233,9 +344,27 @@ export interface StockVoucherLine {
 }
 
 export interface StockVoucherGroup {
+  documentNo?: string
   warehouseName: string
   date: string
   logs: StockVoucherLine[]
+}
+
+export interface StockDocumentSummary {
+  key: string
+  documentNo: string
+  sourceType: string
+  sourceId: string
+  date: string
+  type: 'in' | 'out'
+  warehouseId: string
+  warehouseName: string
+  operator: string
+  reason: string
+  itemCount: number
+  totalQty: number
+  totalAmount: number
+  items: StockLogItem[]
 }
 
 export interface OrderItem {
@@ -258,6 +387,7 @@ export interface OrderDetailLine {
   price: number
   qty: number
   subtotal: number
+  unit: string
 }
 
 export interface PrintLogLine {
@@ -273,6 +403,37 @@ export interface OrderDetailData {
   order: OrderItem
   items: OrderDetailLine[]
   printLogs: PrintLogLine[]
+}
+
+export interface OrderQuantityChange {
+  productId: string
+  qty: number
+}
+
+export interface OrderQuantityUpdateResult {
+  orderNo: string
+  itemCount: number
+  totalAmount: number
+}
+
+export interface OrderVoucherLine {
+  id: string
+  productName: string
+  spec: string
+  unit: string
+  qty: number
+  price: number
+  amount: number
+  remark: string
+}
+
+export interface OrderVoucherGroup {
+  orderNo: string
+  storeName: string
+  time: string
+  itemCount: number
+  operator: string
+  logs: OrderVoucherLine[]
 }
 
 export interface UserItem {

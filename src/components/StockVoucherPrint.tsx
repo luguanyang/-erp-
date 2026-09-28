@@ -28,14 +28,23 @@ export default function StockVoucherPrint({
   if (!open) return null
 
   const allLogs = groups.flatMap((group) => group.logs)
-  const pages = chunk(allLogs, ITEMS_PER_PAGE).map((logs, pageIndex) => ({
-    warehouseName: logs[0]?.warehouseName || groups[0]?.warehouseName || '默认仓库',
-    date: groups[0]?.date || '',
-    logs,
-    pageIndex,
-    pageCount: Math.ceil(allLogs.length / ITEMS_PER_PAGE),
-  }))
+  const pages = groups.flatMap((group) => {
+    const chunks = chunk(group.logs, ITEMS_PER_PAGE)
+    return chunks.map((logs, pageIndex) => ({
+      documentNo: group.documentNo || '',
+      warehouseName: logs[0]?.warehouseName || group.warehouseName || '默认仓库',
+      date: group.date || '',
+      logs,
+      pageIndex,
+      pageCount: chunks.length,
+    }))
+  })
   const totalLogs = groups.reduce((sum, group) => sum + group.logs.length, 0)
+  const totalQty = allLogs.reduce((sum, log) => sum + Number(log.qty || 0), 0)
+  const totalAmount = allLogs.reduce(
+    (sum, log) => sum + Number(log.price || 0) * Number(log.qty || 0),
+    0,
+  )
 
   return createPortal(
     <div className="stock-voucher-overlay">
@@ -66,14 +75,6 @@ export default function StockVoucherPrint({
           const globalStart = pages
             .slice(0, pageIndex)
             .reduce((sum, item) => sum + item.logs.length, 0)
-          const totalQty = page.logs.reduce(
-            (sum, log) => sum + Number(log.qty || 0),
-            0,
-          )
-          const totalAmount = page.logs.reduce(
-            (sum, log) => sum + Number(log.price || 0) * Number(log.qty || 0),
-            0,
-          )
           return (
             <div
               className="stock-voucher-page"
@@ -82,7 +83,9 @@ export default function StockVoucherPrint({
               <div className="stock-voucher-title-row">
                 <h2 className="stock-voucher-title">入库单</h2>
                 <span className="stock-voucher-no">
-                  No: RK-{page.date}-{String(page.pageIndex + 1).padStart(4, '0')}
+                  No:{' '}
+                  {page.documentNo ||
+                    `RK-${page.date}-${String(page.pageIndex + 1).padStart(4, '0')}`}
                   {page.pageCount > 1 ? `  ${page.pageIndex + 1}/${page.pageCount}` : ''}
                 </span>
               </div>
@@ -128,19 +131,21 @@ export default function StockVoucherPrint({
                     )
                   })}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3} className="stock-voucher-total-label">
-                      合计
-                    </td>
-                    <td className="stock-voucher-center">{totalQty}</td>
-                    <td />
-                    <td className="stock-voucher-right">
-                      {totalAmount.toFixed(2)}
-                    </td>
+                {page.pageIndex === page.pageCount - 1 ? (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} className="stock-voucher-total-label">
+                        合计
+                      </td>
+                      <td className="stock-voucher-center">{totalQty}</td>
                       <td />
-                  </tr>
-                </tfoot>
+                      <td className="stock-voucher-right">
+                        {totalAmount.toFixed(2)}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                ) : null}
               </table>
               <div className="stock-voucher-sign">
                 <span>申报人：{page.logs[0]?.inboundBy || '______________'}</span>

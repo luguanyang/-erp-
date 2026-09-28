@@ -1,38 +1,15 @@
 import { createPortal } from 'react-dom'
 import { Button, Space } from 'antd'
 import { CloseOutlined, PrinterOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
-import type { DepartmentLogItem } from '../types'
+import type { OrderVoucherGroup } from '../types'
 
-export interface PurchaseVoucherGroup {
-  warehouseName: string
-  date: string
-  logType: string
-  creator?: string
-  inspector?: string
-  departmentManager?: string
-  logs: DepartmentLogItem[]
-}
-
-interface PurchaseVoucherPrintProps {
+interface OrderVoucherPrintProps {
   open: boolean
-  groups: PurchaseVoucherGroup[]
+  groups: OrderVoucherGroup[]
   onClose: () => void
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  daily: '日常采购单',
-  direct: '直拨单',
-  purchase_return: '采购退货单',
-}
-
 const ITEMS_PER_PAGE = 5
-
-function voucherNo(group: PurchaseVoucherGroup, pageIndex: number) {
-  const prefix =
-    group.logType === 'direct' ? 'ZB' : group.logType === 'daily' ? 'CG' : 'TH'
-  return `${prefix}-${group.date}-${String(pageIndex + 1).padStart(4, '0')}`
-}
 
 function chunk<T>(items: T[], size: number) {
   const result: T[][] = []
@@ -42,42 +19,43 @@ function chunk<T>(items: T[], size: number) {
   return result
 }
 
-export default function PurchaseVoucherPrint({
+export default function OrderVoucherPrint({
   open,
   groups,
   onClose,
-}: PurchaseVoucherPrintProps) {
+}: OrderVoucherPrintProps) {
   if (!open) return null
 
-  const allLogs = groups.flatMap((group) => group.logs)
-  const pages = chunk(allLogs, ITEMS_PER_PAGE).map((logs, pageIndex) => ({
-    warehouseName:
-      logs[0]?.targetName || logs[0]?.fromName || logs[0]?.toName || groups[0]?.warehouseName || '默认',
-    date: logs[0]?.date || groups[0]?.date || '',
-    logType: logs[0]?.logType || groups[0]?.logType || 'daily',
-    creator: groups[0]?.creator || logs[0]?.operator || '',
-    inspector: groups[0]?.inspector || '',
-    departmentManager: groups[0]?.departmentManager || '',
-    logs,
-    pageIndex,
-    pageCount: Math.ceil(allLogs.length / ITEMS_PER_PAGE),
-  }))
+  const pages = groups.flatMap((group) => {
+    const chunks = chunk(group.logs, ITEMS_PER_PAGE)
+    const groupQty = group.logs.reduce(
+      (sum, log) => sum + Number(log.qty || 0),
+      0,
+    )
+    const groupAmount = group.logs.reduce(
+      (sum, log) => sum + Number(log.amount || 0),
+      0,
+    )
+    return chunks.map((logs, pageIndex) => ({
+      ...group,
+      logs,
+      groupQty,
+      groupAmount,
+      pageIndex,
+      pageCount: chunks.length,
+    }))
+  })
   const totalLogs = groups.reduce((sum, group) => sum + group.logs.length, 0)
-  const totalQty = allLogs.reduce((sum, log) => sum + Number(log.qty || 0), 0)
-  const totalAmount = allLogs.reduce(
-    (sum, log) => sum + Number(log.amount || 0),
-    0,
-  )
 
   return createPortal(
     <div className="stock-voucher-overlay">
       <div className="stock-voucher-toolbar">
         <div>
-          <strong>采购流水凭证</strong>
+          <strong>订单凭证</strong>
           <span className="stock-voucher-toolbar-desc">
             {totalLogs > 1
-              ? `共 ${totalLogs} 条采购记录，${pages.length} 张凭证`
-              : '单条采购记录'}
+              ? `共 ${groups.length} 张订单，${pages.length} 张凭证`
+              : '单张订单凭证'}
           </span>
         </div>
         <Space>
@@ -94,28 +72,26 @@ export default function PurchaseVoucherPrint({
         </Space>
       </div>
       <div className="stock-voucher-print">
-        {pages.map((page, pageIndex) => {
-          const globalStart = pages
-            .slice(0, pageIndex)
-            .reduce((sum, item) => sum + item.logs.length, 0)
+        {pages.map((page) => {
+          const isLastPage = page.pageIndex === page.pageCount - 1
           return (
             <div
               className="stock-voucher-page"
-              key={`${page.warehouseName}-${page.date}-${pageIndex}-${page.pageIndex}`}
+              key={`${page.orderNo}-${page.pageIndex}`}
             >
               <div className="stock-voucher-title-row">
-                <h2 className="stock-voucher-title">
-                  {TYPE_LABELS[page.logType] || '采购单'}
-                </h2>
+                <h2 className="stock-voucher-title">订货单</h2>
                 <span className="stock-voucher-no">
-                  No: {voucherNo(page, page.pageIndex)}
-                  {page.pageCount > 1 ? `  ${page.pageIndex + 1}/${page.pageCount}` : ''}
+                  No: {page.orderNo}
+                  {page.pageCount > 1
+                    ? `  ${page.pageIndex + 1}/${page.pageCount}`
+                    : ''}
                 </span>
               </div>
               <div className="stock-voucher-meta">
-                <span>供应商：{page.logs[0]?.supplier || '-'}</span>
-                <span>收货部门：{page.warehouseName || '默认'}</span>
-                <span>制表日期：{page.date}</span>
+                <span>门店：{page.storeName || '-'}</span>
+                <span>下单时间：{page.time || '-'}</span>
+                <span>商品件数：{page.itemCount}</span>
               </div>
               <table className="stock-voucher-table">
                 <thead>
@@ -131,13 +107,16 @@ export default function PurchaseVoucherPrint({
                 </thead>
                 <tbody>
                   {page.logs.map((log, index) => (
-                    <tr key={log.id || `${page.date}-${index}`}>
-                      <td className="stock-voucher-center">{globalStart + index + 1}</td>
-                      <td>{log.productName}</td>
-                      <td className="stock-voucher-center">{log.unit || '件'}</td>
+                    <tr key={log.id || `${page.orderNo}-${index}`}>
                       <td className="stock-voucher-center">
-                        {Number(log.qty || 0)}
+                        {page.pageIndex * ITEMS_PER_PAGE + index + 1}
                       </td>
+                      <td>
+                        {log.productName}
+                        {log.spec ? `（${log.spec}）` : ''}
+                      </td>
+                      <td className="stock-voucher-center">{log.unit || '件'}</td>
+                      <td className="stock-voucher-center">{Number(log.qty || 0)}</td>
                       <td className="stock-voucher-right">
                         {Number(log.price || 0).toFixed(2)}
                       </td>
@@ -147,17 +126,35 @@ export default function PurchaseVoucherPrint({
                       <td>{log.remark || '-'}</td>
                     </tr>
                   ))}
+                  {Array.from(
+                    { length: Math.max(0, ITEMS_PER_PAGE - page.logs.length) },
+                    (_, index) => (
+                      <tr
+                        className="stock-voucher-empty-row"
+                        key={`empty-${page.orderNo}-${page.pageIndex}-${index}`}
+                        aria-hidden="true"
+                      >
+                        <td className="stock-voucher-center">&#160;</td>
+                        <td>&#160;</td>
+                        <td className="stock-voucher-center">&#160;</td>
+                        <td className="stock-voucher-center">&#160;</td>
+                        <td className="stock-voucher-right">&#160;</td>
+                        <td className="stock-voucher-right">&#160;</td>
+                        <td>&#160;</td>
+                      </tr>
+                    ),
+                  )}
                 </tbody>
-                {page.pageIndex === page.pageCount - 1 ? (
+                {isLastPage ? (
                   <tfoot>
                     <tr>
                       <td colSpan={3} className="stock-voucher-total-label">
                         合计
                       </td>
-                      <td className="stock-voucher-center">{totalQty}</td>
+                      <td className="stock-voucher-center">{page.groupQty}</td>
                       <td />
                       <td className="stock-voucher-right">
-                        {totalAmount.toFixed(2)}
+                        {page.groupAmount.toFixed(2)}
                       </td>
                       <td />
                     </tr>
@@ -165,12 +162,12 @@ export default function PurchaseVoucherPrint({
                 ) : null}
               </table>
               <div className="stock-voucher-sign">
-                <span>供应商：______________</span>
-                <span>部门主管：{page.departmentManager || '______________'}</span>
+                <span>门店签收：______________</span>
+                <span>制单人：{page.operator || '______________'}</span>
               </div>
               <div className="stock-voucher-sign stock-voucher-sign-second">
-                <span>验货人：{page.inspector || '______________'}</span>
-                <span>制单人：{page.creator || page.logs[0]?.operator || '______________'}</span>
+                <span>核单人：______________</span>
+                <span>仓库确认：______________</span>
               </div>
             </div>
           )

@@ -95,7 +95,7 @@ export default function Statistics() {
     rows.push(['统计日期', `${startDate} 至 ${endDate}`])
     rows.push(['商品种类', stats.kindCount])
     rows.push(['累计件数', stats.itemCount])
-    rows.push(['订货金额', Number(stats.totalAmount || 0).toFixed(2)])
+    rows.push(['订货金额', Number(stats.totalAmount || 0)])
     rows.push([])
     rows.push(['分类', '商品', '规格', '累计份数', '单位'])
 
@@ -113,6 +113,7 @@ export default function Statistics() {
     })
 
     const sheet = XLSX.utils.aoa_to_sheet(rows)
+    if (sheet.B6) sheet.B6.z = '0.00'
     sheet['!cols'] = [
       { wch: 12 },
       { wch: 24 },

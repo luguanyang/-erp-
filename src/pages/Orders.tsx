@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Key } from 'react'
 import {
   Button,
   Checkbox,
@@ -14,11 +14,25 @@ import {
   Tag,
   message,
 } from 'antd'
-import { EyeOutlined, PrinterOutlined, SearchOutlined } from '@ant-design/icons'
+import {
+  DownloadOutlined,
+  EditOutlined,
+  EyeOutlined,
+  PrinterOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
-import type { OrderDetailData, OrderItem, PrinterItem, StoreItem } from '../types'
+import OrderVoucherPrint from '../components/OrderVoucherPrint'
+import type {
+  OrderDetailData,
+  OrderItem,
+  OrderVoucherGroup,
+  OrderVoucherLine,
+  PrinterItem,
+  StoreItem,
+} from '../types'
 
 interface OrderFilters {
   keyword: string
@@ -48,6 +62,15 @@ export default function Orders() {
   const [selectedPrinterIds, setSelectedPrinterIds] = useState<string[]>([])
   const [copies, setCopies] = useState(1)
   const [printLoading, setPrintLoading] = useState(false)
+  const [editingQty, setEditingQty] = useState(false)
+  const [draftQty, setDraftQty] = useState<Record<string, number>>({})
+  const [qtySaving, setQtySaving] = useState(false)
+  const [selectedOrderKeys, setSelectedOrderKeys] = useState<Key[]>([])
+  const [voucherOpen, setVoucherOpen] = useState(false)
+  const [voucherGroups, setVoucherGroups] = useState<OrderVoucherGroup[]>([])
+  const [voucherLoading, setVoucherLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const qtyInputRefs = useRef<Record<string, { focus: () => void } | null>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -83,19 +106,228 @@ export default function Orders() {
 
   useEffect(() => {
     setPage(1)
+    setSelectedOrderKeys([])
   }, [filters])
 
-  async function openDetail(orderNo: string) {
+  async function openDetail(orderNo: string): Promise<OrderDetailData | null> {
     setDetailLoading(true)
     try {
       const res = await api.orderDetail(orderNo)
       setDetail(res)
+      setEditingQty(false)
+      setDraftQty({})
+      return res
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载订单详情失败')
+      return null
     } finally {
       setDetailLoading(false)
     }
   }
+
+  function closeDetail() {
+    setDetail(null)
+    setEditingQty(false)
+    setDraftQty({})
+    setQtySaving(false)
+  }
+
+  function buildOrderVoucherGroup(
+    detailData: OrderDetailData,
+  ): OrderVoucherGroup | null {
+    const logs: OrderVoucherLine[] = detailData.items
+      .filter((item) => Number(item.qty || 0) > 0)
+      .map((item, index) => ({
+        id: `${detailData.order.orderNo}-${item.productId}`,
+        productName: item.productName,
+        spec: item.spec,
+        unit: item.unit || '件',
+        qty: Number(item.qty || 0),
+        price: Number(item.price || 0),
+        amount: Number(item.price || 0) * Number(item.qty || 0),
+        remark: index === 0 ? detailData.order.remark || '' : '',
+      }))
+    if (!logs.length) return null
+    return {
+      orderNo: detailData.order.orderNo,
+      storeName: detailData.order.storeName,
+      time: detailData.order.time,
+      itemCount: logs.reduce((sum, item) => sum + item.qty, 0),
+      operator: '',
+      logs,
+    }
+  }
+
+  async function printOrderVouchers(orderNos: string[]) {
+    if (!orderNos.length) {
+      message.warning('请先勾选要打印凭证的订单')
+      return
+    }
+    setVoucherLoading(true)
+    try {
+      const details = await Promise.all(orderNos.map((orderNo) => api.orderDetail(orderNo)))
+      const groups = details
+        .map(buildOrderVoucherGroup)
+        .filter((group): group is OrderVoucherGroup => !!group)
+      if (!groups.length) {
+        message.warning('所选订单没有可打印的商品')
+        return
+      }
+      setVoucherGroups(groups)
+      setVoucherOpen(true)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载订单凭证失败')
+    } finally {
+      setVoucherLoading(false)
+    }
+  }
+
+  async function exportOrdersExcel() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const rows: OrderItem[] = []
+      let nextPage = 1
+      let totalCount = 1
+      do {
+        const res = await api.orderList({
+          page: nextPage,
+          pageSize: 200,
+          keyword: filters.keyword,
+          storeId: filters.storeId,
+          status: filters.status,
+          startDate: filters.range?.[0]
+            ? filters.range[0].format('YYYY-MM-DD')
+            : '',
+          endDate: filters.range?.[1]
+            ? filters.range[1].format('YYYY-MM-DD')
+            : '',
+        })
+        rows.push(...res.list)
+        totalCount = res.total
+        nextPage += 1
+      } while (rows.length < totalCount && nextPage <= 100)
+
+      if (!rows.length) {
+        message.warning('当前筛选条件下没有可导出的订单')
+        return
+      }
+      const XLSX = await import('xlsx')
+      const sheet = XLSX.utils.json_to_sheet(
+        rows.map((row) => ({
+          订单号: row.orderNo,
+          门店: row.storeName,
+          下单时间: row.time,
+          商品件数: Number(row.itemCount || 0),
+          金额: Number(row.totalAmount || 0),
+          状态: row.status,
+          备注: row.remark || '',
+        })),
+      )
+      sheet['!cols'] = [
+        { wch: 22 },
+        { wch: 24 },
+        { wch: 20 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 30 },
+      ]
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, sheet, '订单列表')
+      XLSX.writeFile(
+        workbook,
+        `订单管理_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`,
+      )
+      message.success(`已导出 ${rows.length} 条订单`)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '导出订单失败')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function startQtyEdit() {
+    if (!detail || detail.order.status !== '已下单') return
+    const nextDraft: Record<string, number> = {}
+    detail.items.forEach((item) => {
+      nextDraft[item.productId] = Number(item.qty || 0)
+    })
+    setDraftQty(nextDraft)
+    setEditingQty(true)
+  }
+
+  function cancelQtyEdit() {
+    setEditingQty(false)
+    setDraftQty({})
+  }
+
+  async function saveQtyEdits(printAfterSave = false) {
+    if (!detail || qtySaving) return
+    const changes = detail.items
+      .filter((item) => Number(draftQty[item.productId] ?? item.qty) !== Number(item.qty))
+      .map((item) => ({
+        productId: item.productId,
+        qty: Math.max(0, Math.floor(Number(draftQty[item.productId] ?? item.qty))),
+      }))
+    if (!changes.length) {
+      if (!printAfterSave) {
+        message.warning('商品数量没有变化')
+        return
+      }
+      const group = buildOrderVoucherGroup(detail)
+      if (!group) {
+        message.warning('当前订单没有可打印的商品')
+        return
+      }
+      setVoucherGroups([group])
+      setVoucherOpen(true)
+      return
+    }
+    setQtySaving(true)
+    try {
+      await api.orderUpdateQty({
+        orderNo: detail.order.orderNo,
+        changes,
+      })
+      message.success('商品数量已更新')
+      const refreshedDetail = await openDetail(detail.order.orderNo)
+      await load()
+      if (printAfterSave) {
+        if (!refreshedDetail) {
+          message.warning('商品数量已更新，但凭证加载失败，请重新打开订单详情后重试')
+          return
+        }
+        const group = buildOrderVoucherGroup(refreshedDetail)
+        if (!group) {
+          message.warning('当前订单没有可打印的商品')
+          return
+        }
+        setVoucherGroups([group])
+        setVoucherOpen(true)
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '修改数量失败')
+    } finally {
+      setQtySaving(false)
+    }
+  }
+
+  const previewItems =
+    detail?.items.map((item) => ({
+      ...item,
+      qty: editingQty
+        ? Math.max(0, Math.floor(Number(draftQty[item.productId] ?? item.qty)))
+        : Number(item.qty || 0),
+    })) || []
+  const previewItemCount = previewItems.reduce(
+    (sum, item) => sum + Number(item.qty || 0),
+    0,
+  )
+  const previewTotalAmount = previewItems.reduce(
+    (sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0),
+    0,
+  )
 
   function confirmCancel(record: OrderItem) {
     Modal.confirm({
@@ -172,6 +404,26 @@ export default function Orders() {
       <PageHeader
         title="订单管理"
         subtitle="按门店、日期和状态查看全部门店订单。"
+        extra={
+          <Space>
+            <Button
+              icon={<DownloadOutlined />}
+              loading={exporting}
+              onClick={exportOrdersExcel}
+            >
+              导出 Excel
+            </Button>
+            <Button
+              icon={<PrinterOutlined />}
+              loading={voucherLoading}
+              disabled={selectedOrderKeys.length === 0}
+              onClick={() => printOrderVouchers(selectedOrderKeys.map(String))}
+            >
+              打印凭证
+              {selectedOrderKeys.length ? `（${selectedOrderKeys.length}）` : ''}
+            </Button>
+          </Space>
+        }
       />
       <div className="filter-bar">
         <Input
@@ -214,6 +466,14 @@ export default function Orders() {
           <Table<OrderItem>
             rowKey="orderNo"
             dataSource={list}
+            rowSelection={{
+              selectedRowKeys: selectedOrderKeys,
+              preserveSelectedRowKeys: false,
+              onChange: setSelectedOrderKeys,
+              getCheckboxProps: (record) => ({
+                disabled: record.status !== '已下单',
+              }),
+            }}
             pagination={{
               current: page,
               pageSize,
@@ -222,6 +482,7 @@ export default function Orders() {
               onChange: (p, s) => {
                 setPage(p)
                 setPageSize(s)
+                setSelectedOrderKeys([])
               },
             }}
             columns={[
@@ -246,7 +507,7 @@ export default function Orders() {
               },
               {
                 title: '操作',
-                width: 230,
+                width: 330,
                 render: (_, record) => (
                   <Space>
                     <Button
@@ -257,6 +518,15 @@ export default function Orders() {
                     >
                       查看
                     </Button>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<PrinterOutlined />}
+                      disabled={record.status !== '已下单' || voucherLoading}
+                      onClick={() => printOrderVouchers([record.orderNo])}
+                    >
+                      打印凭证
+                    </Button>
                     {record.status === '已下单' ? (
                       <>
                         <Button
@@ -265,7 +535,7 @@ export default function Orders() {
                           icon={<PrinterOutlined />}
                           onClick={() => openPrint(record.orderNo)}
                         >
-                          打印
+                          打印小票
                         </Button>
                         <Button type="link" size="small" danger onClick={() => confirmCancel(record)}>
                           取消
@@ -283,8 +553,30 @@ export default function Orders() {
         title="订单详情"
         width={640}
         open={!!detail}
-        onCancel={() => setDetail(null)}
-        footer={null}
+        onCancel={closeDetail}
+        footer={
+          editingQty ? (
+            <Space>
+              <Button
+                icon={<PrinterOutlined />}
+                disabled={qtySaving}
+                onClick={() => saveQtyEdits(true)}
+              >
+                打印凭证
+              </Button>
+              <Button onClick={cancelQtyEdit} disabled={qtySaving}>
+                取消
+              </Button>
+              <Button
+                type="primary"
+                loading={qtySaving}
+                onClick={() => saveQtyEdits()}
+              >
+                保存修改
+              </Button>
+            </Space>
+          ) : null
+        }
         maskClosable={false}
         keyboard={false}
         loading={detailLoading}
@@ -300,9 +592,14 @@ export default function Orders() {
               </Descriptions.Item>
               <Descriptions.Item label="门店">{detail.order.storeName}</Descriptions.Item>
               <Descriptions.Item label="下单时间">{detail.order.time}</Descriptions.Item>
-              <Descriptions.Item label="商品件数">{detail.order.itemCount}</Descriptions.Item>
-              <Descriptions.Item label="合计金额">
-                ¥{Number(detail.order.totalAmount || 0).toFixed(2)}
+              <Descriptions.Item label={editingQty ? '修改后件数' : '商品件数'}>
+                {editingQty ? previewItemCount : detail.order.itemCount}
+              </Descriptions.Item>
+              <Descriptions.Item label={editingQty ? '修改后金额' : '合计金额'}>
+                ¥
+                {Number(
+                  editingQty ? previewTotalAmount : detail.order.totalAmount || 0,
+                ).toFixed(2)}
               </Descriptions.Item>
               <Descriptions.Item label="备注" span={2}>
                 {detail.order.remark || '无'}
@@ -313,8 +610,33 @@ export default function Orders() {
               size="small"
               pagination={false}
               dataSource={detail.items}
-              title={() => <strong>商品明细</strong>}
+              title={() => (
+                <Space
+                  style={{
+                    width: '100%',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <strong>商品明细</strong>
+                  {detail.order.status === '已下单' && !editingQty ? (
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={startQtyEdit}
+                    >
+                      修改数量
+                    </Button>
+                  ) : null}
+                </Space>
+              )}
               columns={[
+                {
+                  title: '序号',
+                  width: 56,
+                  align: 'center',
+                  render: (_, __, index) => index + 1,
+                },
                 { title: '商品', dataIndex: 'productName' },
                 { title: '规格', dataIndex: 'spec' },
                 {
@@ -323,12 +645,74 @@ export default function Orders() {
                   align: 'right',
                   render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
                 },
-                { title: '数量', dataIndex: 'qty', align: 'right' },
+                {
+                  title: '数量',
+                  dataIndex: 'qty',
+                  align: 'right',
+                  render: (value: number, record) =>
+                    editingQty ? (
+                      <InputNumber
+                        ref={(node) => {
+                          qtyInputRefs.current[record.productId] = node
+                        }}
+                        min={0}
+                        precision={0}
+                        step={1}
+                        keyboard={false}
+                        value={draftQty[record.productId] ?? Number(value || 0)}
+                        onChange={(nextValue) =>
+                          setDraftQty((current) => ({
+                            ...current,
+                            [record.productId]: Math.max(
+                              0,
+                              Math.floor(Number(nextValue) || 0),
+                            ),
+                          }))
+                        }
+                        onKeyDown={(event) => {
+                          if (
+                            event.key !== 'ArrowUp' &&
+                            event.key !== 'ArrowDown' &&
+                            event.key !== 'Enter'
+                          ) {
+                            return
+                          }
+                          event.preventDefault()
+                          const currentIndex = detail.items.findIndex(
+                            (item) => item.productId === record.productId,
+                          )
+                          const targetIndex =
+                            event.key === 'ArrowUp' ? currentIndex - 1 : currentIndex + 1
+                          if (
+                            currentIndex < 0 ||
+                            targetIndex < 0 ||
+                            targetIndex >= detail.items.length
+                          ) {
+                            return
+                          }
+                          qtyInputRefs.current[detail.items[targetIndex].productId]?.focus()
+                        }}
+                        style={{ width: 76 }}
+                      />
+                    ) : (
+                      value
+                    ),
+                },
                 {
                   title: '小计',
                   dataIndex: 'subtotal',
                   align: 'right',
-                  render: (value: number) => `¥${Number(value || 0).toFixed(2)}`,
+                  render: (value: number, record) => {
+                    const qty = editingQty
+                      ? Math.max(
+                          0,
+                          Math.floor(
+                            Number(draftQty[record.productId] ?? record.qty) || 0,
+                          ),
+                        )
+                      : Number(record.qty || 0)
+                    return `¥${(Number(record.price || 0) * qty).toFixed(2)}`
+                  },
                 },
               ]}
             />
@@ -394,6 +778,11 @@ export default function Orders() {
           />
         </div>
       </Modal>
+      <OrderVoucherPrint
+        open={voucherOpen}
+        groups={voucherGroups}
+        onClose={() => setVoucherOpen(false)}
+      />
     </>
   )
 }

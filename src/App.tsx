@@ -16,6 +16,7 @@ const Inventory = lazy(() => import('./pages/Inventory'))
 const StockLogs = lazy(() => import('./pages/StockLogs'))
 const ProcessLogs = lazy(() => import('./pages/ProcessLogs'))
 const StockCountLogs = lazy(() => import('./pages/StockCountLogs'))
+const StoreCount = lazy(() => import('./pages/StoreCount'))
 const Warehouses = lazy(() => import('./pages/Warehouses'))
 const Departments = lazy(() => import('./pages/Departments'))
 const Orders = lazy(() => import('./pages/Orders'))
@@ -60,6 +61,7 @@ const router = createHashRouter([
       { path: 'inventory/logs', element: <StockLogs /> },
       { path: 'inventory/process', element: <ProcessLogs /> },
       { path: 'inventory/counts', element: <StockCountLogs /> },
+      { path: 'inventory/store-count', element: <StoreCount /> },
       { path: 'warehouses', element: <Warehouses /> },
       { path: 'departments', element: <Departments /> },
       { path: 'orders', element: <Orders /> },

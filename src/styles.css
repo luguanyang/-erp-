@@ -329,6 +329,114 @@ body {
   padding: 0 4px 8px;
 }
 
+.purchase-detail-modal .ant-modal-header {
+  margin-bottom: 10px;
+}
+
+.purchase-detail-modal .ant-modal-body {
+  padding-top: 12px;
+}
+
+.purchase-detail-title-main {
+  font-weight: 600;
+}
+
+.purchase-detail-title-meta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.purchase-detail-table .ant-table-thead > tr > th {
+  padding: 5px 6px;
+}
+
+.purchase-detail-table .ant-table-tbody > tr > td {
+  padding: 4px 6px;
+}
+
+.purchase-detail-table .ant-btn-link {
+  padding-inline: 4px;
+}
+
+.purchase-detail-total {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px solid #f0e6dc;
+  border-radius: 8px;
+  background: rgba(255, 252, 248, 0.97);
+  box-shadow: 0 -6px 16px rgba(48, 36, 25, 0.08);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.product-entry-modal .ant-modal-body {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 12px;
+}
+
+.product-inline-select {
+  width: 100%;
+}
+
+.product-inline-list {
+  max-height: 220px;
+  margin-top: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #eadfd4;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(48, 36, 25, 0.12);
+}
+
+.product-inline-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 9px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.product-inline-option:hover,
+.product-inline-option.active {
+  background: #fff1ec;
+  color: var(--brand);
+}
+
+.product-inline-index {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.product-inline-option.active .product-inline-index {
+  color: var(--brand);
+}
+
+.product-inline-empty {
+  padding: 10px 9px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dept-entry-purchase-row {
+  align-items: start;
+}
+
 .loading-screen {
   min-height: 100vh;
   display: grid;
@@ -615,28 +723,34 @@ body {
 }
 
 .stock-voucher-page {
+  display: flex;
+  flex-direction: column;
+  width: 210mm;
+  height: 93mm;
   min-height: 93mm;
-  padding: 6mm 8mm;
+  max-height: 93mm;
+  padding: 3mm 4mm;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
 .stock-voucher-title {
-  margin: 0 0 2mm;
+  margin: 0 0 1mm;
   text-align: center;
-  font-size: 15pt;
+  font-size: 12pt;
   font-weight: 700;
-  letter-spacing: 1.5mm;
+  letter-spacing: 0.8mm;
 }
 
 .stock-voucher-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 2mm;
+  margin-bottom: 0.7mm;
 }
 
 .stock-voucher-no {
-  font-size: 9pt;
+  font-size: 7.5pt;
   color: #333333;
   white-space: nowrap;
 }
@@ -650,24 +764,34 @@ body {
 
 .stock-voucher-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 2mm;
-  font-size: 9pt;
+  gap: 1mm 4mm;
+  margin-bottom: 1mm;
+  font-size: 7.5pt;
 }
 
 .stock-voucher-table {
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 9pt;
+  font-size: 7.5pt;
 }
 
 .stock-voucher-table th,
 .stock-voucher-table td {
   border: 1px solid #333333;
-  padding: 1.5mm 1mm;
-  line-height: 1.25;
+  padding: 0.6mm 0.7mm;
+  line-height: 1.08;
   vertical-align: middle;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.stock-voucher-table tbody tr {
+  height: 10mm;
 }
 
 .stock-voucher-table th {
@@ -715,13 +839,15 @@ body {
 .stock-voucher-sign {
   display: flex;
   justify-content: space-between;
-  margin-top: 4mm;
-  font-size: 10pt;
+  margin-top: auto;
+  padding-top: 1mm;
+  font-size: 8pt;
 }
 
 .stock-voucher-sign-second {
   justify-content: flex-start;
-  margin-top: 3mm;
+  margin-top: 0.5mm;
+  padding-top: 0;
 }
 
 @media print {
@@ -774,7 +900,11 @@ body {
   .stock-voucher-page {
     break-inside: avoid;
     page-break-inside: avoid;
+    width: 210mm;
+    height: 93mm;
     min-height: 93mm;
+    max-height: 93mm;
+    overflow: hidden;
   }
 
   .stock-voucher-page:not(:last-child) {

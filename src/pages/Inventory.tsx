@@ -31,8 +31,8 @@ import dayjs, { Dayjs } from 'dayjs'
 import { api } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import PageHeader from '../components/PageHeader'
+import ProductInlineSelect from '../components/ProductInlineSelect'
 import StockVoucherPrint from '../components/StockVoucherPrint'
-import { matchesProductText } from '../utils/pinyin'
 import type {
   CategoryItem,
   InventoryItem,
@@ -116,7 +116,6 @@ export default function Inventory() {
   const [batchOpen, setBatchOpen] = useState(false)
   const [batchForm] = Form.useForm<BatchInboundForm>()
   const [batchSaving, setBatchSaving] = useState(false)
-  const [productSearchTexts, setProductSearchTexts] = useState<Record<string, string>>({})
   const [stockVoucherOpen, setStockVoucherOpen] = useState(false)
   const [stockVoucherGroups, setStockVoucherGroups] = useState<StockVoucherGroup[]>([])
   const [page, setPage] = useState(1)
@@ -353,7 +352,6 @@ export default function Inventory() {
   }
 
   function openBatchInbound() {
-    setProductSearchTexts({})
     batchForm.resetFields()
     batchForm.setFieldsValue({
       date: dayjs(),
@@ -508,32 +506,30 @@ export default function Inventory() {
 
     setBatchSaving(true)
     try {
-      for (let index = 0; index < validItems.length; index += 1) {
-        const item = validItems[index]
-        try {
-          await api.stockMove({
-            productId: item.productId,
-            type: 'in',
-            qty: Number(item.qty || 0),
-            price: Number(item.price || 0),
-            warehouseId: values.warehouseId,
-            inboundBy: values.inboundBy,
-            operatorName: values.operatorName,
-            reason: item.remark || '',
-          })
-        } catch (err) {
-          message.error(
-            `第 ${index + 1} 条入库失败：${
-              err instanceof Error ? err.message : '请检查商品和数量'
-            }`,
-          )
-          return
-        }
-      }
-      message.success(`批量入库成功，共 ${validItems.length} 条`)
+      const result = await api.stockBatchMove({
+        type: 'in',
+        warehouseId: values.warehouseId,
+        inboundBy: values.inboundBy,
+        operatorName: values.operatorName,
+        sourceType: 'batch_inbound',
+        date: values.date ? values.date.format('YYYY-MM-DD') : undefined,
+        items: validItems.map((item) => ({
+          productId: item.productId,
+          qty: Number(item.qty || 0),
+          price: Number(item.price || 0),
+          remark: item.remark || '',
+        })),
+      })
+      message.success(
+        `批量入库成功，共 ${validItems.length} 条，单据号 ${result.documentNo}`,
+      )
       setBatchOpen(false)
       removeBatchDraft()
       await load()
+    } catch (err) {
+      message.error(
+        err instanceof Error ? err.message : '批量入库失败，请检查商品和数量',
+      )
     } finally {
       setBatchSaving(false)
     }
@@ -986,6 +982,7 @@ export default function Inventory() {
       </Modal>
 
       <Modal
+        className="product-entry-modal"
         title="批量入库"
         width={920}
         open={batchOpen}
@@ -1050,69 +1047,9 @@ export default function Inventory() {
                       name={[field.name, 'productId']}
                       rules={[{ required: true, message: '请选择商品' }]}
                     >
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
+                      <ProductInlineSelect
                         placeholder="选择商品"
                         options={productOptions}
-                        onSearch={(value) =>
-                          setProductSearchTexts((prev) => ({
-                            ...prev,
-                            [field.name]: value || '',
-                          }))
-                        }
-                        filterOption={(input, option) => {
-                          const keyword = String(input || '').trim()
-                          if (!keyword) return true
-                          return matchesProductText(keyword, option?.label)
-                        }}
-                        optionRender={(option) => {
-                          const keyword = (
-                            productSearchTexts[field.name] || ''
-                          ).trim()
-                          if (!keyword) return option.label
-                          const visibleOptions = productOptions.filter((item) =>
-                            matchesProductText(keyword, item.label),
-                          )
-                          const index = visibleOptions.findIndex(
-                            (item) => item.value === option.value,
-                          )
-                          return (
-                            <span>
-                              {index >= 0 ? `${index + 1}. ` : ''}
-                              {option.label}
-                            </span>
-                          )
-                        }}
-                        onChange={() =>
-                          setProductSearchTexts((prev) => {
-                            const next = { ...prev }
-                            delete next[field.name]
-                            return next
-                          })
-                        }
-                        onInputKeyDown={(event) => {
-                          if (!/^[0-9]$/.test(event.key)) return
-                          const keyword = String(event.currentTarget.value || '').trim()
-                          if (!keyword) return
-                          const visibleOptions = productOptions.filter((option) =>
-                            matchesProductText(keyword, option.label),
-                          )
-                          const index = event.key === '0' ? 9 : Number(event.key) - 1
-                          const target = visibleOptions[index]
-                          if (!target) return
-                          event.preventDefault()
-                          event.stopPropagation()
-                          batchForm.setFieldValue(
-                            ['items', field.name, 'productId'],
-                            target.value,
-                          )
-                          setProductSearchTexts((prev) => {
-                            const next = { ...prev }
-                            delete next[field.name]
-                            return next
-                          })
-                        }}
                       />
                     </Form.Item>
                     <Form.Item
