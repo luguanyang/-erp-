@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Avatar,
   Button,
@@ -64,9 +64,24 @@ export default function Products() {
     subcategory: '',
     status: '',
   })
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
+  const editingPriceIdRef = useRef<string | null>(null)
+  const [priceDraft, setPriceDraft] = useState<number | null>(null)
+  const priceDraftRef = useRef<number | null>(null)
+  const [savingPriceId, setSavingPriceId] = useState<string | null>(null)
+  const savingPriceIdsRef = useRef<Set<string>>(new Set())
+  const priceInputRefs = useRef<
+    Record<string, { focus: () => void; select: () => void } | null>
+  >({})
+  const skipPriceBlurIdRef = useRef<string | null>(null)
+  const previousEditingPriceIdRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    editingPriceIdRef.current = null
+    priceDraftRef.current = null
+    setEditingPriceId(null)
+    setPriceDraft(null)
     try {
       const res = await api.productList({
         page,
@@ -107,7 +122,101 @@ export default function Products() {
     setPage(1)
   }, [filters])
 
+  useEffect(() => {
+    const previousId = previousEditingPriceIdRef.current
+    if (
+      previousId &&
+      previousId !== editingPriceId &&
+      skipPriceBlurIdRef.current === previousId
+    ) {
+      skipPriceBlurIdRef.current = null
+    }
+    previousEditingPriceIdRef.current = editingPriceId
+    if (!editingPriceId || savingPriceId === editingPriceId) return
+    const input = priceInputRefs.current[editingPriceId]
+    input?.focus()
+    input?.select()
+  }, [editingPriceId, savingPriceId])
+
   const currentCategory = categories.find((c) => c.key === filters.category)
+
+  function beginPriceEdit(record: ProductItem) {
+    const price = Number(record.price || 0)
+    editingPriceIdRef.current = record.id
+    priceDraftRef.current = price
+    setEditingPriceId(record.id)
+    setPriceDraft(price)
+  }
+
+  function stopPriceEdit(id: string) {
+    if (editingPriceIdRef.current !== id) return
+    editingPriceIdRef.current = null
+    priceDraftRef.current = null
+    setEditingPriceId(null)
+    setPriceDraft(null)
+  }
+
+  function moveToNextPrice(record: ProductItem) {
+    const index = list.findIndex((item) => item.id === record.id)
+    const nextRecord = index >= 0 ? list[index + 1] : null
+    if (nextRecord) beginPriceEdit(nextRecord)
+  }
+
+  async function commitPrice(record: ProductItem, moveNext = false) {
+    if (
+      editingPriceIdRef.current !== record.id ||
+      savingPriceIdsRef.current.has(record.id)
+    ) {
+      return false
+    }
+    const rawPrice = priceDraftRef.current
+    const nextPrice =
+      rawPrice === null || rawPrice === undefined
+        ? null
+        : Math.round(Number(rawPrice) * 100) / 100
+    if (nextPrice === null || !Number.isFinite(nextPrice) || nextPrice < 0) {
+      skipPriceBlurIdRef.current = null
+      message.warning('请输入有效的非负单价')
+      requestAnimationFrame(() => priceInputRefs.current[record.id]?.focus())
+      return false
+    }
+    const currentPrice = Math.round(Number(record.price || 0) * 100) / 100
+    if (nextPrice === currentPrice) {
+      stopPriceEdit(record.id)
+      if (moveNext) moveToNextPrice(record)
+      return true
+    }
+
+    savingPriceIdsRef.current.add(record.id)
+    setSavingPriceId(record.id)
+    try {
+      await api.productUpdate({ id: record.id, price: nextPrice })
+      setList((current) =>
+        current.map((item) =>
+          item.id === record.id ? { ...item, price: nextPrice } : item,
+        ),
+      )
+      stopPriceEdit(record.id)
+      if (moveNext) moveToNextPrice(record)
+      return true
+    } catch (err) {
+      editingPriceIdRef.current = record.id
+      priceDraftRef.current = nextPrice
+      setEditingPriceId(record.id)
+      setPriceDraft(nextPrice)
+      skipPriceBlurIdRef.current = null
+      message.error(err instanceof Error ? err.message : '单价保存失败')
+      requestAnimationFrame(() => {
+        const input = priceInputRefs.current[record.id]
+        input?.focus()
+        input?.select()
+      })
+      return false
+    } finally {
+      savingPriceIdsRef.current.delete(record.id)
+      setSavingPriceId((current) => (current === record.id ? null : current))
+    }
+  }
 
   function openCreate() {
     setEditing(null)
@@ -293,20 +402,87 @@ export default function Products() {
               { title: '分类', dataIndex: 'categoryName', width: 100 },
               { title: '子分类', dataIndex: 'subcategory', width: 120 },
               {
-                title: '单价',
+                title: (
+                  <span>
+                    单价{' '}
+                    <span style={{ color: '#9ca3af', fontSize: 11, fontWeight: 400 }}>
+                      点击可改
+                    </span>
+                  </span>
+                ),
                 dataIndex: 'price',
-                width: 150,
+                width: 170,
                 align: 'right',
                 render: (value: number, record) => (
-                  <span>
-                    ¥{Number(value || 0).toFixed(2)}
+                  <Space size={6}>
+                    {editingPriceId === record.id ? (
+                      <>
+                        <InputNumber
+                          ref={(node) => {
+                            priceInputRefs.current[record.id] = node
+                          }}
+                          min={0}
+                          precision={2}
+                          step={0.1}
+                          controls={false}
+                          disabled={savingPriceId === record.id}
+                          value={priceDraft}
+                          onChange={(nextValue) => {
+                            const next =
+                              nextValue === null || nextValue === undefined
+                                ? null
+                                : Number(nextValue)
+                            priceDraftRef.current = next
+                            setPriceDraft(next)
+                          }}
+                          onFocus={(event) => event.currentTarget.select()}
+                          onPressEnter={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            skipPriceBlurIdRef.current = record.id
+                            void commitPrice(record, true)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Escape') return
+                            event.preventDefault()
+                            event.stopPropagation()
+                            skipPriceBlurIdRef.current = record.id
+                            stopPriceEdit(record.id)
+                          }}
+                          onBlur={() => {
+                            if (skipPriceBlurIdRef.current === record.id) {
+                              skipPriceBlurIdRef.current = null
+                              return
+                            }
+                            void commitPrice(record)
+                          }}
+                          style={{ width: 110 }}
+                          aria-label={`修改${record.name}的单价`}
+                        />
+                        {savingPriceId === record.id ? <Spin size="small" /> : null}
+                      </>
+                    ) : (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title="点击即可修改"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => beginPriceEdit(record)}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          beginPriceEdit(record)
+                        }}
+                      >
+                        ¥{Number(value || 0).toFixed(2)}
+                      </span>
+                    )}
                     {Number(record.costMultiplier || 1) !== 1 ? (
                       <span style={{ color: '#9ca3af', fontSize: 12 }}>
-                        {' '}
                         ×{record.costMultiplier}
                       </span>
                     ) : null}
-                  </span>
+                  </Space>
                 ),
               },
               {
