@@ -5,87 +5,21 @@ import { api } from '../api'
 import PageHeader from '../components/PageHeader'
 import PrintPreview from '../components/PrintPreview'
 import PrintTemplateFields from '../components/PrintTemplateFields'
-import type { PrintTemplate } from '../types'
-
-const thermalFallback: PrintTemplate = {
-  headerText: '金港连锁门店下单系统',
-  titleText: '订货单',
-  footerText: '谢谢惠顾',
-  showStore: true,
-  showOrderNo: true,
-  showTime: true,
-  showRemark: true,
-  showUnit: true,
-  showPrice: true,
-  showSubtotal: true,
-  showTotal: true,
-  showStorage: true,
-  align: 'center',
-  separator: '--------------------------------',
-  itemGap: 1,
-  showItemIndex: true,
-  showCategory: true,
-  thermalSizes: {
-    header: 20,
-    title: 12,
-    category: 12,
-    head: 12,
-    store: 12,
-    orderNo: 12,
-    time: 12,
-    remark: 12,
-    storage: 12,
-    name: 12,
-    qty: 12,
-    price: 12,
-    subtotal: 12,
-    total: 12,
-    footer: 12,
-  },
-}
-
-const labelFallback: PrintTemplate = {
-  headerText: '金港订货单',
-  titleText: '订货单',
-  footerText: '',
-  showStore: true,
-  showOrderNo: true,
-  showTime: true,
-  showRemark: true,
-  showUnit: true,
-  showPrice: true,
-  showSubtotal: true,
-  showTotal: true,
-  showStorage: true,
-  align: 'left',
-  separator: '',
-  labelWidth: 60,
-  labelHeight: 40,
-  fontSize: 12,
-  lineGap: 6,
-  emphasizeName: false,
-  fontSizes: {
-    header: 12,
-    title: 12,
-    store: 12,
-    orderNo: 12,
-    time: 12,
-    remark: 12,
-    storage: 12,
-    name: 12,
-    qty: 12,
-    price: 12,
-    subtotal: 12,
-    footer: 12,
-  },
-}
+import {
+  labelFallback,
+  mergeVoucherTemplate,
+  thermalFallback,
+  voucherFallback,
+} from '../printTemplateDefaults'
+import type { PrintTemplate, PrintTemplateType } from '../types'
 
 export default function PrintTemplates() {
   const [form] = Form.useForm<PrintTemplate>()
-  const [type, setType] = useState<'thermal' | 'label'>('thermal')
-  const [defaults, setDefaults] = useState<Record<'thermal' | 'label', PrintTemplate>>({
+  const [type, setType] = useState<PrintTemplateType>('thermal')
+  const [defaults, setDefaults] = useState<Record<PrintTemplateType, PrintTemplate>>({
     thermal: thermalFallback,
     label: labelFallback,
+    voucher: voucherFallback,
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -98,11 +32,16 @@ export default function PrintTemplates() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [thermal, label] = await Promise.all([
+      const [thermal, label, voucher] = await Promise.all([
         api.printTemplateGet('thermal'),
         api.printTemplateGet('label'),
+        api.printTemplateGet('voucher'),
       ])
-      const next = { thermal: thermal.template, label: label.template }
+      const next = {
+        thermal: thermal.template,
+        label: label.template,
+        voucher: mergeVoucherTemplate(voucher.template),
+      }
       setDefaults(next)
       form.setFieldsValue(next[type])
     } catch (err) {
@@ -117,7 +56,8 @@ export default function PrintTemplates() {
   }, [loadAll])
 
   function changeType(next: string) {
-    const nextType = next === 'label' ? 'label' : 'thermal'
+    const nextType: PrintTemplateType =
+      next === 'label' || next === 'voucher' ? next : 'thermal'
     setType(nextType)
     form.setFieldsValue(defaults[nextType])
   }
@@ -162,7 +102,7 @@ export default function PrintTemplates() {
     <>
       <PageHeader
         title="打印模板"
-        subtitle="维护热敏小票和标签打印的内容样式，小程序与后台打印会同时生效。"
+        subtitle="维护热敏小票、标签和订单凭证的内容样式，后台打印会按当前模板生效。"
         extra={
           <Space>
             <Button onClick={loadAll}>重新加载</Button>
@@ -180,6 +120,7 @@ export default function PrintTemplates() {
             items={[
               { key: 'thermal', label: '热敏小票' },
               { key: 'label', label: '标签打印' },
+              { key: 'voucher', label: '订单凭证' },
             ]}
           />
           <Spin spinning={loading}>
@@ -191,9 +132,16 @@ export default function PrintTemplates() {
         <div className="template-preview-panel">
           <div className="preview-toolbar">
             <span>实时预览</span>
-            <Button size="small" icon={<CodeOutlined />} loading={previewLoading} onClick={preview}>
-              查看生成内容
-            </Button>
+            {type !== 'voucher' ? (
+              <Button
+                size="small"
+                icon={<CodeOutlined />}
+                loading={previewLoading}
+                onClick={preview}
+              >
+                查看生成内容
+              </Button>
+            ) : null}
           </div>
           <div className="preview-stage">
             <PrintPreview type={type} template={current} />

@@ -122,6 +122,8 @@ export interface ProductOption {
   name: string
   spec: string
   unit: string
+  price: number
+  outOfStock: boolean
   status: 'active' | 'disabled'
 }
 
@@ -416,6 +418,13 @@ export interface OrderQuantityUpdateResult {
   totalAmount: number
 }
 
+export interface OrderReplaceItemResult {
+  orderNo: string
+  itemCount: number
+  totalAmount: number
+  merged: boolean
+}
+
 export interface OrderVoucherLine {
   id: string
   productName: string
@@ -479,10 +488,53 @@ export interface PrintLogItem {
   createdAt: string | Date
 }
 
+export type PrintTemplateType = 'thermal' | 'label' | 'voucher'
+
+export type VoucherSizeKey =
+  | 'header'
+  | 'title'
+  | 'no'
+  | 'meta'
+  | 'tableHead'
+  | 'tableBody'
+  | 'tableTotal'
+  | 'sign'
+  | 'footer'
+
+export type VoucherSizes = Record<VoucherSizeKey, number>
+
+export interface VoucherLabels {
+  store: string
+  time: string
+  itemCount: string
+  index: string
+  product: string
+  unit: string
+  qty: string
+  price: string
+  amount: string
+  remark: string
+  total: string
+  signStore: string
+  signMaker: string
+  signChecker: string
+  signWarehouse: string
+}
+
+export interface VoucherSpacing {
+  titleGap: number
+  metaGap: number
+  rowHeight: number
+  cellPadding: number
+  lineHeight: number
+  signGap: number
+}
+
 export interface PrintTemplate {
   headerText: string
   titleText: string
   footerText: string
+  showDailyNo: boolean
   showStore: boolean
   showOrderNo: boolean
   showTime: boolean
@@ -504,6 +556,9 @@ export interface PrintTemplate {
   showItemIndex?: boolean
   showCategory?: boolean
   thermalSizes?: Record<string, number>
+  voucherLabels?: VoucherLabels
+  voucherSizes?: VoucherSizes
+  voucherSpacing?: VoucherSpacing
 }
 
 export interface PageResult<T> {

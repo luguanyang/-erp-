@@ -612,11 +612,31 @@ export default function Products() {
             </Form.Item>
             <Form.Item name="unit" label="单位" style={{ flex: 1 }}>
               <Select
+                showSearch
+                optionFilterProp="label"
                 options={[
                   { value: '斤', label: '斤' },
                   { value: '件', label: '件' },
                   { value: '盒', label: '盒' },
                   { value: '桶', label: '桶' },
+                  { value: '瓶', label: '瓶' },
+                  { value: '扎', label: '扎' },
+                  { value: '包', label: '包' },
+                  { value: '袋', label: '袋' },
+                  { value: '只', label: '只' },
+                  { value: '本', label: '本' },
+                  { value: '个', label: '个' },
+                  { value: '张', label: '张' },
+                  { value: '款', label: '款' },
+                  { value: '块', label: '块' },
+                  { value: '份', label: '份' },
+                  { value: '双', label: '双' },
+                  { value: '套', label: '套' },
+                  { value: '批', label: '批' },
+                  { value: '碗', label: '碗' },
+                  { value: '台', label: '台' },
+                  { value: '罐', label: '罐' },
+                  { value: '条', label: '条' },
                 ]}
               />
             </Form.Item>

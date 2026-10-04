@@ -20,17 +20,23 @@ import {
   EyeOutlined,
   PrinterOutlined,
   SearchOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader'
 import OrderVoucherPrint from '../components/OrderVoucherPrint'
+import ProductInlineSelect from '../components/ProductInlineSelect'
+import { voucherFallback } from '../printTemplateDefaults'
 import type {
   OrderDetailData,
+  OrderDetailLine,
   OrderItem,
   OrderVoucherGroup,
   OrderVoucherLine,
   PrinterItem,
+  PrintTemplate,
+  ProductOption,
   StoreItem,
 } from '../types'
 
@@ -39,6 +45,12 @@ interface OrderFilters {
   storeId: string
   status: string
   range: [Dayjs, Dayjs] | null
+}
+
+function normalizeQty(value: number | null | undefined) {
+  const qty = Number(value)
+  if (!Number.isFinite(qty)) return 0
+  return Math.max(0, Math.round(qty * 10) / 10)
 }
 
 export default function Orders() {
@@ -68,8 +80,13 @@ export default function Orders() {
   const [selectedOrderKeys, setSelectedOrderKeys] = useState<Key[]>([])
   const [voucherOpen, setVoucherOpen] = useState(false)
   const [voucherGroups, setVoucherGroups] = useState<OrderVoucherGroup[]>([])
+  const [voucherTemplate, setVoucherTemplate] = useState<PrintTemplate>(voucherFallback)
   const [voucherLoading, setVoucherLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [products, setProducts] = useState<ProductOption[]>([])
+  const [replaceItem, setReplaceItem] = useState<OrderDetailLine | null>(null)
+  const [replacementProductId, setReplacementProductId] = useState('')
+  const [replacementSaving, setReplacementSaving] = useState(false)
   const qtyInputRefs = useRef<Record<string, { focus: () => void } | null>>({})
 
   const load = useCallback(async () => {
@@ -93,12 +110,25 @@ export default function Orders() {
     }
   }, [page, pageSize, filters])
 
+  const loadProducts = useCallback(async () => {
+    try {
+      const res = await api.productOptions()
+      setProducts(res.list)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载商品列表失败')
+    }
+  }, [])
+
   useEffect(() => {
     api
       .storeList()
       .then((res) => setStores(res.list))
       .catch(() => undefined)
   }, [])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   useEffect(() => {
     load()
@@ -130,6 +160,9 @@ export default function Orders() {
     setEditingQty(false)
     setDraftQty({})
     setQtySaving(false)
+    setReplaceItem(null)
+    setReplacementProductId('')
+    setReplacementSaving(false)
   }
 
   function buildOrderVoucherGroup(
@@ -165,7 +198,10 @@ export default function Orders() {
     }
     setVoucherLoading(true)
     try {
-      const details = await Promise.all(orderNos.map((orderNo) => api.orderDetail(orderNo)))
+      const [details, templateRes] = await Promise.all([
+        Promise.all(orderNos.map((orderNo) => api.orderDetail(orderNo))),
+        api.printTemplateGet('voucher'),
+      ])
       const groups = details
         .map(buildOrderVoucherGroup)
         .filter((group): group is OrderVoucherGroup => !!group)
@@ -173,10 +209,29 @@ export default function Orders() {
         message.warning('所选订单没有可打印的商品')
         return
       }
+      setVoucherTemplate(templateRes.template)
       setVoucherGroups(groups)
       setVoucherOpen(true)
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载订单凭证失败')
+    } finally {
+      setVoucherLoading(false)
+    }
+  }
+
+  async function openVoucherGroups(groups: OrderVoucherGroup[]) {
+    if (!groups.length) {
+      message.warning('当前订单没有可打印的商品')
+      return
+    }
+    setVoucherLoading(true)
+    try {
+      const templateRes = await api.printTemplateGet('voucher')
+      setVoucherTemplate(templateRes.template)
+      setVoucherGroups(groups)
+      setVoucherOpen(true)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '加载订单凭证模板失败')
     } finally {
       setVoucherLoading(false)
     }
@@ -265,10 +320,14 @@ export default function Orders() {
   async function saveQtyEdits(printAfterSave = false) {
     if (!detail || qtySaving) return
     const changes = detail.items
-      .filter((item) => Number(draftQty[item.productId] ?? item.qty) !== Number(item.qty))
+      .filter(
+        (item) =>
+          normalizeQty(draftQty[item.productId] ?? item.qty) !==
+          normalizeQty(item.qty),
+      )
       .map((item) => ({
         productId: item.productId,
-        qty: Math.max(0, Math.floor(Number(draftQty[item.productId] ?? item.qty))),
+        qty: normalizeQty(draftQty[item.productId] ?? item.qty),
       }))
     if (!changes.length) {
       if (!printAfterSave) {
@@ -280,8 +339,7 @@ export default function Orders() {
         message.warning('当前订单没有可打印的商品')
         return
       }
-      setVoucherGroups([group])
-      setVoucherOpen(true)
+      await openVoucherGroups([group])
       return
     }
     setQtySaving(true)
@@ -303,8 +361,7 @@ export default function Orders() {
           message.warning('当前订单没有可打印的商品')
           return
         }
-        setVoucherGroups([group])
-        setVoucherOpen(true)
+        await openVoucherGroups([group])
       }
     } catch (err) {
       message.error(err instanceof Error ? err.message : '修改数量失败')
@@ -317,8 +374,8 @@ export default function Orders() {
     detail?.items.map((item) => ({
       ...item,
       qty: editingQty
-        ? Math.max(0, Math.floor(Number(draftQty[item.productId] ?? item.qty)))
-        : Number(item.qty || 0),
+        ? normalizeQty(draftQty[item.productId] ?? item.qty)
+        : normalizeQty(item.qty),
     })) || []
   const previewItemCount = previewItems.reduce(
     (sum, item) => sum + Number(item.qty || 0),
@@ -328,6 +385,70 @@ export default function Orders() {
     (sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0),
     0,
   )
+  const replacementOptions = products
+    .filter(
+      (product) =>
+        product.status === 'active' &&
+        !product.outOfStock &&
+        product.id !== replaceItem?.productId,
+    )
+    .map((product) => ({
+      value: product.id,
+      label: `${product.name}${product.spec ? `（${product.spec}）` : ''} · ¥${Number(
+        product.price || 0,
+      ).toFixed(2)}/${product.unit || '件'}`,
+    }))
+  const replacementProduct = products.find(
+    (product) => product.id === replacementProductId,
+  )
+  const replacementExistingItem = detail?.items.find(
+    (item) =>
+      item.productId === replacementProductId &&
+      item.productId !== replaceItem?.productId,
+  )
+  const replacementNextQty = replaceItem
+    ? Number(replaceItem.qty || 0) + Number(replacementExistingItem?.qty || 0)
+    : 0
+  const replacementNextSubtotal =
+    Number(replacementProduct?.price || 0) * replacementNextQty
+
+  function openReplaceItem(record: OrderDetailLine) {
+    if (!detail || detail.order.status !== '已下单' || editingQty) return
+    setReplaceItem(record)
+    setReplacementProductId('')
+    void loadProducts()
+  }
+
+  function closeReplaceItem() {
+    if (replacementSaving) return
+    setReplaceItem(null)
+    setReplacementProductId('')
+  }
+
+  async function submitReplaceItem() {
+    if (!detail || !replaceItem || replacementSaving) return
+    if (!replacementProductId) {
+      message.warning('请选择要更换的商品')
+      return
+    }
+    setReplacementSaving(true)
+    try {
+      const result = await api.orderReplaceItem({
+        orderNo: detail.order.orderNo,
+        productId: replaceItem.productId,
+        newProductId: replacementProductId,
+      })
+      setReplaceItem(null)
+      setReplacementProductId('')
+      message.success(result.merged ? '商品已更换并合并数量' : '商品已更换')
+      await openDetail(detail.order.orderNo)
+      await load()
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '更换商品失败')
+    } finally {
+      setReplacementSaving(false)
+    }
+  }
 
   function confirmCancel(record: OrderItem) {
     Modal.confirm({
@@ -656,17 +777,14 @@ export default function Orders() {
                           qtyInputRefs.current[record.productId] = node
                         }}
                         min={0}
-                        precision={0}
-                        step={1}
+                        precision={1}
+                        step={0.1}
                         keyboard={false}
                         value={draftQty[record.productId] ?? Number(value || 0)}
                         onChange={(nextValue) =>
                           setDraftQty((current) => ({
                             ...current,
-                            [record.productId]: Math.max(
-                              0,
-                              Math.floor(Number(nextValue) || 0),
-                            ),
+                            [record.productId]: normalizeQty(nextValue),
                           }))
                         }
                         onKeyDown={(event) => {
@@ -704,15 +822,28 @@ export default function Orders() {
                   align: 'right',
                   render: (value: number, record) => {
                     const qty = editingQty
-                      ? Math.max(
-                          0,
-                          Math.floor(
-                            Number(draftQty[record.productId] ?? record.qty) || 0,
-                          ),
-                        )
-                      : Number(record.qty || 0)
+                      ? normalizeQty(draftQty[record.productId] ?? record.qty)
+                      : normalizeQty(record.qty)
                     return `¥${(Number(record.price || 0) * qty).toFixed(2)}`
                   },
+                },
+                {
+                  title: '操作',
+                  width: 104,
+                  align: 'center',
+                  render: (_, record) =>
+                    detail.order.status === '已下单' && !editingQty ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<SwapOutlined />}
+                        onClick={() => openReplaceItem(record)}
+                      >
+                        更换商品
+                      </Button>
+                    ) : (
+                      '-'
+                    ),
                 },
               ]}
             />
@@ -733,6 +864,81 @@ export default function Orders() {
                 },
               ]}
             />
+          </Space>
+        ) : null}
+      </Modal>
+      <Modal
+        title="更换商品"
+        width={560}
+        open={!!replaceItem}
+        onCancel={closeReplaceItem}
+        onOk={submitReplaceItem}
+        confirmLoading={replacementSaving}
+        okText="确认更换"
+        cancelText="取消"
+        maskClosable={false}
+        keyboard={!replacementSaving}
+        className="product-entry-modal"
+        destroyOnClose
+      >
+        {replaceItem ? (
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="原商品">
+                {replaceItem.productName}
+                {replaceItem.spec ? `（${replaceItem.spec}）` : ''}
+              </Descriptions.Item>
+              <Descriptions.Item label="原数量">
+                {replaceItem.qty}
+                {replaceItem.unit || '件'}
+              </Descriptions.Item>
+              <Descriptions.Item label="原单价">
+                ¥{Number(replaceItem.price || 0).toFixed(2)}
+              </Descriptions.Item>
+            </Descriptions>
+            <div>
+              <div style={{ marginBottom: 8, fontWeight: 600 }}>新商品</div>
+              <ProductInlineSelect
+                value={replacementProductId}
+                options={replacementOptions}
+                placeholder="输入商品名称、规格或拼音搜索"
+                disabled={replacementSaving}
+                onChange={setReplacementProductId}
+              />
+            </div>
+            {replacementProduct ? (
+              <>
+                <Descriptions bordered column={1} size="small">
+                  <Descriptions.Item label="新商品规格">
+                    {replacementProduct.spec || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="当前单价">
+                    ¥{Number(replacementProduct.price || 0).toFixed(2)}/
+                    {replacementProduct.unit || '件'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="更换后数量">
+                    {replacementNextQty}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="预计小计">
+                    ¥{replacementNextSubtotal.toFixed(2)}
+                  </Descriptions.Item>
+                </Descriptions>
+                {replacementExistingItem ? (
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      border: '1px solid #ffe0b2',
+                      borderRadius: 8,
+                      background: '#fff8e1',
+                      color: '#8c5b00',
+                      fontSize: 13,
+                    }}
+                  >
+                    该商品已在订单中，更换后数量将合并，合并行统一按新商品当前单价重算。
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </Space>
         ) : null}
       </Modal>
@@ -781,6 +987,7 @@ export default function Orders() {
       <OrderVoucherPrint
         open={voucherOpen}
         groups={voucherGroups}
+        template={voucherTemplate}
         onClose={() => setVoucherOpen(false)}
       />
     </>

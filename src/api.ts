@@ -11,12 +11,14 @@ import type {
   OrderItem,
   OrderQuantityChange,
   OrderQuantityUpdateResult,
+  OrderReplaceItemResult,
   PageResult,
   ProcessLogItem,
   StockLogItem,
   PrinterItem,
   PrintLogItem,
   PrintTemplate,
+  PrintTemplateType,
   ProductOption,
   ProductItem,
   StatsSummary,
@@ -225,6 +227,11 @@ export const api = {
     callAdmin<{ orderNo: string; status: string }>({ action: 'order.cancel', orderNo }),
   orderUpdateQty: (data: { orderNo: string; changes: OrderQuantityChange[] }) =>
     callAdmin<OrderQuantityUpdateResult>({ action: 'order.updateQty', ...data }),
+  orderReplaceItem: (data: {
+    orderNo: string
+    productId: string
+    newProductId: string
+  }) => callAdmin<OrderReplaceItemResult>({ action: 'order.replaceItem', ...data }),
 
   userList: (data: object) =>
     callAdmin<PageResult<UserItem>>({ action: 'user.list', ...data }),
@@ -251,19 +258,19 @@ export const api = {
   printLogList: (data: object) =>
     callAdmin<PageResult<PrintLogItem>>({ action: 'printLog.list', ...data }),
 
-  printTemplateGet: (type: 'thermal' | 'label') =>
-    callAdmin<{ type: 'thermal' | 'label'; template: PrintTemplate }>({
+  printTemplateGet: (type: PrintTemplateType) =>
+    callAdmin<{ type: PrintTemplateType; template: PrintTemplate }>({
       action: 'printTemplate.get',
       type,
     }),
-  printTemplateUpdate: (type: 'thermal' | 'label', template: PrintTemplate) =>
-    callAdmin<{ type: 'thermal' | 'label'; template: PrintTemplate }>({
+  printTemplateUpdate: (type: PrintTemplateType, template: PrintTemplate) =>
+    callAdmin<{ type: PrintTemplateType; template: PrintTemplate }>({
       action: 'printTemplate.update',
       type,
       template,
     }),
-  printTemplatePreview: (type: 'thermal' | 'label', template: PrintTemplate) =>
-    callAdmin<{ type: 'thermal' | 'label'; content: string; contents: string[]; apiname: string }>({
+  printTemplatePreview: (type: PrintTemplateType, template: PrintTemplate) =>
+    callAdmin<{ type: PrintTemplateType; content: string; contents: string[]; apiname: string }>({
       action: 'printTemplate.preview',
       type,
       template,

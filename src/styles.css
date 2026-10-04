@@ -697,7 +697,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 210mm;
+  max-width: 241mm;
   margin: 0 auto 16px;
   padding: 12px 16px;
   background: #ffffff;
@@ -714,30 +714,69 @@ body {
 }
 
 .stock-voucher-print {
-  width: 210mm;
+  width: 241mm;
   margin: 0 auto;
-  background: #ffffff;
+  background: transparent;
   color: #111111;
   font-family: "SimSun", "NSimSun", "宋体", serif;
+}
+
+.stock-voucher-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 241mm;
+  height: 279mm;
+  min-height: 279mm;
+  max-height: 279mm;
+  overflow: hidden;
+  background: #ffffff;
   box-shadow: 0 12px 32px rgba(32, 36, 42, 0.2);
+}
+
+.stock-voucher-sheet + .stock-voucher-sheet {
+  margin-top: 18px;
 }
 
 .stock-voucher-page {
   display: flex;
   flex-direction: column;
-  width: 210mm;
+  flex: 0 0 93mm;
+  width: 241mm;
   height: 93mm;
   min-height: 93mm;
   max-height: 93mm;
-  padding: 3mm 4mm;
+  padding: 8mm 4mm 2mm;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-.stock-voucher-title {
-  margin: 0 0 1mm;
+.stock-voucher-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100%;
+  transform: scale(var(--voucher-fit-scale, 1));
+  transform-origin: top center;
+}
+
+.stock-voucher-empty-slot {
+  flex: 0 0 93mm;
+  width: 241mm;
+  height: 93mm;
+  min-height: 93mm;
+  max-height: 93mm;
+}
+
+.stock-voucher-header {
+  margin-bottom: var(--voucher-title-gap, 1mm);
   text-align: center;
-  font-size: 12pt;
+  font-size: var(--voucher-header-size, 7.5pt);
+}
+
+.stock-voucher-title {
+  margin: 0 0 var(--voucher-title-gap, 1mm);
+  text-align: center;
+  font-size: var(--voucher-title-size, 12pt);
   font-weight: 700;
   letter-spacing: 0.8mm;
 }
@@ -750,7 +789,7 @@ body {
 }
 
 .stock-voucher-no {
-  font-size: 7.5pt;
+  font-size: var(--voucher-no-size, 7.5pt);
   color: #333333;
   white-space: nowrap;
 }
@@ -767,8 +806,8 @@ body {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 1mm 4mm;
-  margin-bottom: 1mm;
-  font-size: 7.5pt;
+  margin-bottom: var(--voucher-meta-gap, 1mm);
+  font-size: var(--voucher-meta-size, 7.5pt);
 }
 
 .stock-voucher-table {
@@ -777,27 +816,32 @@ body {
   min-height: 0;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 7.5pt;
+  font-size: var(--voucher-table-body-size, 7.5pt);
 }
 
 .stock-voucher-table th,
 .stock-voucher-table td {
   border: 1px solid #333333;
-  padding: 0.6mm 0.7mm;
-  line-height: 1.08;
+  padding: var(--voucher-cell-padding, 0.6mm) 0.7mm;
+  line-height: var(--voucher-line-height, 1.08);
   vertical-align: middle;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
 .stock-voucher-table tbody tr {
-  height: 10mm;
+  height: var(--voucher-row-height, 10mm);
 }
 
 .stock-voucher-table th {
   background: #f2f2f2;
   font-weight: 700;
   text-align: center;
+  font-size: var(--voucher-table-head-size, 7.5pt);
+}
+
+.stock-voucher-table tfoot td {
+  font-size: var(--voucher-table-total-size, 7.5pt);
 }
 
 .stock-voucher-col-index {
@@ -828,6 +872,7 @@ body {
 .stock-voucher-total-label {
   font-weight: 700;
   text-align: center;
+  font-size: var(--voucher-table-total-size, 7.5pt);
 }
 
 .stock-voucher-note {
@@ -840,25 +885,58 @@ body {
   display: flex;
   justify-content: space-between;
   margin-top: auto;
-  padding-top: 1mm;
-  font-size: 8pt;
+  padding-top: var(--voucher-sign-gap, 1mm);
+  font-size: var(--voucher-sign-size, 8pt);
 }
 
 .stock-voucher-sign-second {
   justify-content: flex-start;
-  margin-top: 0.5mm;
+  margin-top: calc(var(--voucher-sign-gap, 1mm) / 2);
   padding-top: 0;
+}
+
+.stock-voucher-footer {
+  margin-top: var(--voucher-sign-gap, 1mm);
+  text-align: center;
+  font-size: var(--voucher-footer-size, 7.5pt);
+  color: #333333;
+}
+
+.voucher-preview-shell {
+  width: 100%;
+}
+
+.voucher-preview-caption {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.voucher-preview-viewport {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: 68mm;
+  overflow: hidden;
+}
+
+.voucher-preview-scaler {
+  flex: 0 0 241mm;
+  width: 241mm;
+  transform: scale(0.62);
+  transform-origin: top center;
 }
 
 @media print {
   @page {
-    size: 210mm 93mm landscape;
+    size: 241mm 279mm;
     margin: 0;
   }
 
   html,
   body {
-    width: 210mm;
+    width: 241mm;
     height: auto;
     margin: 0;
     padding: 0;
@@ -879,7 +957,7 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 210mm;
+    width: 241mm;
     overflow: visible;
     padding: 0;
     margin: 0;
@@ -892,7 +970,18 @@ body {
 
   .stock-voucher-print {
     position: static;
-    width: 210mm;
+    width: 241mm;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .stock-voucher-sheet {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    width: 241mm;
+    height: 279mm;
+    min-height: 279mm;
+    max-height: 279mm;
     margin: 0;
     box-shadow: none;
   }
@@ -900,21 +989,11 @@ body {
   .stock-voucher-page {
     break-inside: avoid;
     page-break-inside: avoid;
-    width: 210mm;
+    width: 241mm;
     height: 93mm;
     min-height: 93mm;
     max-height: 93mm;
     overflow: hidden;
-  }
-
-  .stock-voucher-page:not(:last-child) {
-    break-after: page;
-    page-break-after: always;
-  }
-
-  .stock-voucher-page:last-child {
-    break-after: auto;
-    page-break-after: auto;
   }
 }
 

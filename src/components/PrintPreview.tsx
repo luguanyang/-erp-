@@ -1,7 +1,8 @@
-import type { PrintTemplate } from '../types'
+import { OrderVoucherPage, type OrderVoucherPageData } from './OrderVoucherPrint'
+import type { PrintTemplate, PrintTemplateType } from '../types'
 
 interface PrintPreviewProps {
-  type: 'thermal' | 'label'
+  type: PrintTemplateType
   template?: PrintTemplate
   height?: number
 }
@@ -9,6 +10,7 @@ interface PrintPreviewProps {
 const sample = {
   order: {
     orderNo: 'DD202608180001',
+    dailyNo: 1,
     time: '2026-08-18 09:30',
     itemCount: 3,
     totalAmount: 123.5,
@@ -48,6 +50,28 @@ const sample = {
     },
   ],
   store: { name: '北京朝阳店' },
+}
+
+const voucherSample: OrderVoucherPageData = {
+  orderNo: 'DD202608180001',
+  storeName: sample.store.name,
+  time: sample.order.time,
+  itemCount: sample.items.reduce((sum, item) => sum + item.qty, 0),
+  operator: '张店长',
+  logs: sample.items.map((item, index) => ({
+    id: `sample-${index + 1}`,
+    productName: item.productName,
+    spec: item.spec,
+    unit: item.unit,
+    qty: item.qty,
+    price: item.price,
+    amount: item.subtotal,
+    remark: index === 0 ? '尽快配送' : '',
+  })),
+  groupQty: sample.items.reduce((sum, item) => sum + item.qty, 0),
+  groupAmount: sample.items.reduce((sum, item) => sum + item.subtotal, 0),
+  pageIndex: 0,
+  pageCount: 1,
 }
 
 const LABEL_FONT_CODE = 12
@@ -126,16 +150,17 @@ function fitLabelLine(text: string, size: number, labelWidth: number, field?: st
 const LABEL_FIELD_PRIORITY: Record<string, number> = {
   name: 1,
   qty: 2,
-  storage: 3,
-  store: 4,
-  title: 5,
-  header: 6,
-  price: 7,
-  subtotal: 8,
-  orderNo: 9,
-  time: 10,
-  remark: 11,
-  footer: 12,
+  dailyNo: 3,
+  storage: 4,
+  store: 5,
+  title: 6,
+  header: 7,
+  price: 8,
+  subtotal: 9,
+  orderNo: 10,
+  time: 11,
+  remark: 12,
+  footer: 13,
 }
 
 function buildThermalLines(template: PrintTemplate) {
@@ -149,6 +174,7 @@ function buildThermalLines(template: PrintTemplate) {
     push(template.headerText, 'header')
   }
   if (template.titleText) push(template.titleText, 'title')
+  if (template.showDailyNo) push(`${sample.order.dailyNo}号`, 'dailyNo')
   if (template.separator) lines.push({ text: template.separator, field: '' })
   if (template.showOrderNo) push(`订单号：${sample.order.orderNo}`, 'orderNo')
   if (template.showTime) push(`下单时间：${sample.order.time}`, 'time')
@@ -238,6 +264,7 @@ function thermalLineStyle(
     template.align === 'center' &&
     (line.field === 'header' ||
       line.field === 'title' ||
+      line.field === 'dailyNo' ||
       line.field === 'footer' ||
       line.field === 'store' ||
       line.field === 'category')
@@ -255,6 +282,9 @@ function buildSingleLabelLines(template: PrintTemplate, item: (typeof sample.ite
     lines.push({ text: template.headerText, field: 'header' })
   }
   if (template.titleText) lines.push({ text: template.titleText, field: 'title' })
+  if (template.showDailyNo) {
+    lines.push({ text: `${sample.order.dailyNo}号`, field: 'dailyNo' })
+  }
   const name = `${item.productName}${item.spec ? `(${item.spec})` : ''}`
   lines.push({ text: name, field: 'name' })
   lines.push({ text: `数量：${Number(item.qty || 0)}${item.unit || ''}`, field: 'qty' })
@@ -307,9 +337,9 @@ function buildLabelRenderLines(
       priority: LABEL_FIELD_PRIORITY[line.field] || 99,
     }
   })
-  const essentialFields = new Set(['name', 'qty', 'storage'])
+  const essentialFields = new Set(['name', 'qty', 'dailyNo', 'storage'])
   if (template.showTime) essentialFields.add('time')
-  const protectedLargeFields = new Set(['name', 'qty', 'time', 'store'])
+  const protectedLargeFields = new Set(['name', 'qty', 'dailyNo', 'time', 'store'])
   const pickWithGap = (lineGap: number) => {
     const next: SizedLabelLine[] = []
     let used = 0
@@ -398,6 +428,18 @@ function buildLabelRenderLines(
 export default function PrintPreview({ type, template, height }: PrintPreviewProps) {
   if (!template) {
     return <div className="print-preview-empty">请先在左侧填写模板内容</div>
+  }
+  if (type === 'voucher') {
+    return (
+      <div className="voucher-preview-shell">
+        <div className="voucher-preview-caption">订单凭证 · 241 × 93 mm</div>
+        <div className="voucher-preview-viewport">
+          <div className="voucher-preview-scaler">
+            <OrderVoucherPage page={voucherSample} template={template} />
+          </div>
+        </div>
+      </div>
+    )
   }
   if (type === 'label') {
     const baseWidth = 340
