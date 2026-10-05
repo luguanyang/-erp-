@@ -43,6 +43,7 @@ interface ProductFilter {
   category: string
   subcategory: string
   status: string
+  priceFilter: string
 }
 
 export default function Products() {
@@ -63,6 +64,7 @@ export default function Products() {
     category: '',
     subcategory: '',
     status: '',
+    priceFilter: '',
   })
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const editingPriceIdRef = useRef<string | null>(null)
@@ -90,6 +92,7 @@ export default function Products() {
         category: filters.category,
         subcategory: filters.subcategory,
         status: filters.status,
+        priceFilter: filters.priceFilter,
       })
       setList(res.list)
       setTotal(res.total)
@@ -359,6 +362,14 @@ export default function Products() {
             { value: 'disabled', label: '未上线' },
           ]}
           onChange={(value) => setFilters((f) => ({ ...f, status: value || '' }))}
+        />
+        <Select
+          allowClear
+          placeholder="全部价格"
+          style={{ width: 140 }}
+          value={filters.priceFilter || undefined}
+          options={[{ value: 'zero', label: '仅0元商品' }]}
+          onChange={(value) => setFilters((f) => ({ ...f, priceFilter: value || '' }))}
         />
         <Button type="primary" onClick={load}>
           查询
