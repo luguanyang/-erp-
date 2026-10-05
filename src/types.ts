@@ -454,6 +454,7 @@ export interface UserItem {
   storeName: string
   phone: string
   authUsername: string
+  authUid: string
   hasOpenid: boolean
   createdAt: string | Date
 }

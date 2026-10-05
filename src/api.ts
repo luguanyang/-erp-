@@ -36,8 +36,7 @@ import type {
 } from './types'
 
 export const api = {
-  profile: (authUsername?: string) =>
-    callAdmin<AdminProfile>({ action: 'admin.profile', authUsername: authUsername || '' }),
+  profile: () => callAdmin<AdminProfile>({ action: 'admin.profile' }),
 
   dashboardStats: () => callAdmin<DashboardStats>({ action: 'dashboard.stats' }),
 

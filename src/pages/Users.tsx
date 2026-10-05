@@ -25,6 +25,7 @@ interface UserForm {
   phone?: string
   password?: string
   authUsername?: string
+  authUid?: string
 }
 
 export default function Users() {
@@ -85,6 +86,7 @@ export default function Users() {
       phone: record.phone,
       password: '',
       authUsername: record.authUsername,
+      authUid: record.authUid,
     })
     setDrawerOpen(true)
   }
@@ -201,6 +203,21 @@ export default function Users() {
                 render: (value: string) => (value ? <Tag color="green">{value}</Tag> : '-'),
               },
               {
+                title: '账号绑定',
+                dataIndex: 'authUid',
+                width: 100,
+                render: (value: string, record) =>
+                  record.role === 'head' ? (
+                    value ? (
+                      <Tag color="green">已绑定</Tag>
+                    ) : (
+                      <Tag color="orange">待绑定</Tag>
+                    )
+                  ) : (
+                    '-'
+                  ),
+              },
+              {
                 title: '创建时间',
                 dataIndex: 'createdAt',
                 width: 140,
@@ -243,6 +260,11 @@ export default function Users() {
           </Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select
+              onChange={(value) => {
+                if (value === 'store') {
+                  form.setFieldsValue({ authUid: undefined, authUsername: undefined })
+                }
+              }}
               options={[
                 { value: 'store', label: '门店账号' },
                 { value: 'head', label: '总负责人' },
@@ -267,14 +289,30 @@ export default function Users() {
                   />
                 </Form.Item>
               ) : (
-                <Form.Item name="storeId" label="关联门店（总负责人可留空）">
-                  <Select
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    options={stores.map((s) => ({ value: s.id, label: s.name }))}
-                  />
-                </Form.Item>
+                <>
+                  <Form.Item name="storeId" label="关联门店（总负责人可留空）">
+                    <Select
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      options={stores.map((s) => ({ value: s.id, label: s.name }))}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name="authUsername"
+                    label="后台登录用户名"
+                    extra="与 CloudBase 身份认证中的用户名保持一致，仅用于后台识别。"
+                  >
+                    <Input placeholder="如 jgft8888" />
+                  </Form.Item>
+                  <Form.Item
+                    name="authUid"
+                    label="CloudBase Auth UID"
+                    extra="在 CloudBase 身份认证用户列表中复制 UID，只有当前总负责人能完成绑定。"
+                  >
+                    <Input placeholder="首次绑定时填写，已绑定可保持不变" />
+                  </Form.Item>
+                </>
               )
             }
           </Form.Item>
@@ -287,13 +325,6 @@ export default function Users() {
             rules={editing ? [] : [{ required: true, message: '请输入初始密码' }]}
           >
             <Input.Password placeholder="小程序登录密码" />
-          </Form.Item>
-          <Form.Item
-            name="authUsername"
-            label="后台登录用户名"
-            extra="仅总负责人需要；需先在 CloudBase 用户管理中开通同名账号。"
-          >
-            <Input placeholder="如 admin" />
           </Form.Item>
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => setDrawerOpen(false)}>取消</Button>
